@@ -349,6 +349,5 @@ namespace Football.Locomotion
 
             head.localRotation = Quaternion.Slerp(head.localRotation, initialHeadRot, dt * 5f);
         }
-        }
     }
 }
