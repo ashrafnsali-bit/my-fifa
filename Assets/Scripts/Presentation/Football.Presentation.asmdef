@@ -1,0 +1,21 @@
+{
+    "name": "Football.Presentation",
+    "rootNamespace": "Football.Presentation",
+    "references": [
+        "Football.Core",
+        "Football.Physics",
+        "Football.Locomotion",
+        "Football.MatchEngine",
+        "UnityEngine.UI",
+        "Unity.TextMeshPro"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

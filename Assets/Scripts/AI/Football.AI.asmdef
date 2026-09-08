@@ -1,0 +1,19 @@
+{
+    "name": "Football.AI",
+    "rootNamespace": "Football.Tactics",
+    "references": [
+        "Football.Core",
+        "Football.Data",
+        "Football.Physics",
+        "Football.Locomotion"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

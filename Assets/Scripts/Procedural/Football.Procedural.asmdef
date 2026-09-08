@@ -1,0 +1,17 @@
+{
+    "name": "Football.Procedural",
+    "rootNamespace": "Football.Procedural",
+    "references": [
+        "Football.Core",
+        "Football.Data"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

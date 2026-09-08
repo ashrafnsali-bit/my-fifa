@@ -1,0 +1,17 @@
+{
+    "name": "Football.Audio",
+    "rootNamespace": "Football.Audio",
+    "references": [
+        "Football.Core",
+        "Football.Physics"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

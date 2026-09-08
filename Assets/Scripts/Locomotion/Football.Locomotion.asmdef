@@ -1,0 +1,19 @@
+{
+    "name": "Football.Locomotion",
+    "rootNamespace": "Football.Locomotion",
+    "references": [
+        "Football.Core",
+        "Football.Data",
+        "Football.Physics",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
