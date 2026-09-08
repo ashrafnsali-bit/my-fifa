@@ -247,7 +247,7 @@ namespace Football.Locomotion
 
             bool isMoving = horizontalSpeed > 0.25f;
             bool isSprinting = locomotion != null && locomotion.IsSprinting;
-            bool isGK = locomotion != null && locomotion.Position == PlayerPosition.GK;
+            bool isGK = runtimeState != null && runtimeState.attributes != null && runtimeState.attributes.position == PlayerPosition.GK;
             bool hasBall = runtimeState != null && runtimeState.hasBall;
 
             // 4. Dynamic Turn Banking into Curves

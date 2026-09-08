@@ -34,6 +34,7 @@ namespace Football.Locomotion
 
         public bool IsSprinting => isSprinting;
         public Vector3 Velocity => rb != null ? rb.linearVelocity : Vector3.zero;
+        public PlayerPosition Position => runtimeState != null && runtimeState.attributes != null ? runtimeState.attributes.position : PlayerPosition.CM;
 
         private void Awake()
         {
