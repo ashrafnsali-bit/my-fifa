@@ -1,5 +1,6 @@
 using UnityEngine;
 using Football.Core;
+using Football.Data;
 using Football.PhysicsEngine;
 
 namespace Football.Locomotion
@@ -246,6 +247,8 @@ namespace Football.Locomotion
 
             bool isMoving = horizontalSpeed > 0.25f;
             bool isSprinting = locomotion != null && locomotion.IsSprinting;
+            bool isGK = locomotion != null && locomotion.Position == PlayerPosition.GK;
+            bool hasBall = runtimeState != null && runtimeState.hasBall;
 
             // 4. Dynamic Turn Banking into Curves
             Vector3 currentFwd = transform.forward;
@@ -261,6 +264,7 @@ namespace Football.Locomotion
             // 5. Sprint & Acceleration Forward Pitch Lean
             float speedRatio = Mathf.Clamp01(horizontalSpeed / 8.5f);
             float targetPitch = speedRatio * (isSprinting ? maxSprintLeanAngle : maxSprintLeanAngle * 0.55f);
+            if (isGK && !isSprinting) targetPitch = Mathf.Max(targetPitch, 13.0f); // Goalkeeper eager forward tilt
             currentPitchAngle = Mathf.Lerp(currentPitchAngle, targetPitch, dt * 7f);
 
             // 6. Dynamic Head Tracking towards Football
@@ -269,55 +273,126 @@ namespace Football.Locomotion
             if (isMoving)
             {
                 float freq = isSprinting ? sprintFrequency : jogFrequency;
-                stridePhase += dt * freq;
+                if (hasBall) freq *= 1.16f; // Quick-touch agile dribbling cadence
 
+                stridePhase += dt * freq;
                 float sin = Mathf.Sin(stridePhase);
 
                 // Hip Swings (X-axis pitch)
                 float legAngle = sin * (isSprinting ? maxLegSwingAngle : maxLegSwingAngle * 0.75f);
-                if (leftLeg != null) leftLeg.localRotation = initialLeftLegRot * Quaternion.Euler(legAngle, 0f, 0f);
-                if (rightLeg != null) rightLeg.localRotation = initialRightLegRot * Quaternion.Euler(-legAngle, 0f, 0f);
+                if (hasBall) legAngle *= 0.82f; // Tighter, controlled strides while dribbling
+
+                // Ball-touch micro-nudge on the forward swing foot
+                float leftDribbleNudge = (hasBall && sin < -0.35f) ? -9.0f : 0f;
+                float rightDribbleNudge = (hasBall && sin > 0.35f) ? -9.0f : 0f;
+
+                if (leftLeg != null) leftLeg.localRotation = initialLeftLegRot * Quaternion.Euler(legAngle + leftDribbleNudge, 0f, 0f);
+                if (rightLeg != null) rightLeg.localRotation = initialRightLegRot * Quaternion.Euler(-legAngle + rightDribbleNudge, 0f, 0f);
 
                 // Knee Joint Flexion (Bends backwards when swinging back, straightens on forward stride)
                 float leftKneeBend = Mathf.Clamp(-sin * (isSprinting ? maxKneeBendAngle : maxKneeBendAngle * 0.70f), 0f, maxKneeBendAngle);
                 float rightKneeBend = Mathf.Clamp(sin * (isSprinting ? maxKneeBendAngle : maxKneeBendAngle * 0.70f), 0f, maxKneeBendAngle);
+                if (isGK)
+                {
+                    leftKneeBend = Mathf.Max(leftKneeBend, 18.0f);
+                    rightKneeBend = Mathf.Max(rightKneeBend, 18.0f);
+                }
+
                 if (leftKnee != null) leftKnee.localRotation = initialLeftKneeRot * Quaternion.Euler(leftKneeBend, 0f, 0f);
                 if (rightKnee != null) rightKnee.localRotation = initialRightKneeRot * Quaternion.Euler(rightKneeBend, 0f, 0f);
 
                 // Arm swing in opposition to legs with slight outward flare
                 float armAngle = -sin * (isSprinting ? maxArmSwingAngle : maxArmSwingAngle * 0.65f);
-                if (leftArm != null) leftArm.localRotation = initialLeftArmRot * Quaternion.Euler(armAngle, 0f, 8f);
-                if (rightArm != null) rightArm.localRotation = initialRightArmRot * Quaternion.Euler(-armAngle, 0f, -8f);
+                float armFlare = hasBall ? 16.0f : 8.0f; // Wider arm shielding when dribbling
+
+                if (isGK && !isSprinting)
+                {
+                    // Goalkeeper keeps parry-ready gloves raised even while shuffling
+                    if (leftArm != null) leftArm.localRotation = initialLeftArmRot * Quaternion.Euler(-38f, 18f, 12f);
+                    if (rightArm != null) rightArm.localRotation = initialRightArmRot * Quaternion.Euler(-38f, -18f, -12f);
+                }
+                else
+                {
+                    if (leftArm != null) leftArm.localRotation = initialLeftArmRot * Quaternion.Euler(armAngle, 0f, armFlare);
+                    if (rightArm != null) rightArm.localRotation = initialRightArmRot * Quaternion.Euler(-armAngle, 0f, -armFlare);
+                }
 
                 // Torso: vertical bounce, sprint forward pitch, centrifugal banking, and spinal counter-twist
                 float shoulderTwist = -sin * (isSprinting ? 6.5f : 3.5f);
                 if (torso != null)
                 {
                     float bounce = Mathf.Abs(sin) * torsoBounceHeight;
-                    torso.localPosition = initialTorsoLocalPos + new Vector3(0f, bounce, 0f);
+                    float heightDrop = (hasBall ? -0.032f : 0f) + (isGK ? -0.055f : 0f);
+                    torso.localPosition = initialTorsoLocalPos + new Vector3(0f, bounce + heightDrop, 0f);
                     torso.localRotation = initialTorsoLocalRot * Quaternion.Euler(currentPitchAngle, shoulderTwist, currentBankAngle);
                 }
             }
             else
             {
-                // Idle breathing, stance balance recovery
+                // Idle breathing, stance balance recovery, or goalkeeper athletic low crouch
                 stridePhase = 0f;
-                float breath = Mathf.Sin(Time.time * 2.2f) * 0.012f;
-
-                if (leftLeg != null) leftLeg.localRotation = Quaternion.Slerp(leftLeg.localRotation, initialLeftLegRot, dt * 10f);
-                if (rightLeg != null) rightLeg.localRotation = Quaternion.Slerp(rightLeg.localRotation, initialRightLegRot, dt * 10f);
-                if (leftKnee != null) leftKnee.localRotation = Quaternion.Slerp(leftKnee.localRotation, initialLeftKneeRot, dt * 10f);
-                if (rightKnee != null) rightKnee.localRotation = Quaternion.Slerp(rightKnee.localRotation, initialRightKneeRot, dt * 10f);
-                if (leftArm != null) leftArm.localRotation = Quaternion.Slerp(leftArm.localRotation, initialLeftArmRot, dt * 10f);
-                if (rightArm != null) rightArm.localRotation = Quaternion.Slerp(rightArm.localRotation, initialRightArmRot, dt * 10f);
-
                 currentBankAngle = Mathf.Lerp(currentBankAngle, 0f, dt * 8f);
-                currentPitchAngle = Mathf.Lerp(currentPitchAngle, 0f, dt * 8f);
+                currentPitchAngle = Mathf.Lerp(currentPitchAngle, isGK ? 14.0f : 0f, dt * 8f);
 
-                if (torso != null)
+                if (isGK)
                 {
-                    torso.localPosition = Vector3.Lerp(torso.localPosition, initialTorsoLocalPos + new Vector3(0f, breath, 0f), dt * 10f);
-                    torso.localRotation = Quaternion.Slerp(torso.localRotation, initialTorsoLocalRot, dt * 8f);
+                    // Goalkeeper low athletic crouch stance: bent knees, forward torso, parry-ready gloves, ready foot bounce
+                    float gkBounce = Mathf.Sin(Time.time * 4.2f) * 0.015f;
+                    Quaternion gkLeftArm = initialLeftArmRot * Quaternion.Euler(-42f, 20f, 14f);
+                    Quaternion gkRightArm = initialRightArmRot * Quaternion.Euler(-42f, -20f, -14f);
+                    Quaternion gkLeftLeg = initialLeftLegRot * Quaternion.Euler(14f, 0f, -4f);
+                    Quaternion gkRightLeg = initialRightLegRot * Quaternion.Euler(14f, 0f, 4f);
+                    Quaternion gkKnee = Quaternion.Euler(26f, 0f, 0f);
+
+                    if (leftLeg != null) leftLeg.localRotation = Quaternion.Slerp(leftLeg.localRotation, gkLeftLeg, dt * 8f);
+                    if (rightLeg != null) rightLeg.localRotation = Quaternion.Slerp(rightLeg.localRotation, gkRightLeg, dt * 8f);
+                    if (leftKnee != null) leftKnee.localRotation = Quaternion.Slerp(leftKnee.localRotation, initialLeftKneeRot * gkKnee, dt * 8f);
+                    if (rightKnee != null) rightKnee.localRotation = Quaternion.Slerp(rightKnee.localRotation, initialRightKneeRot * gkKnee, dt * 8f);
+                    if (leftArm != null) leftArm.localRotation = Quaternion.Slerp(leftArm.localRotation, gkLeftArm, dt * 8f);
+                    if (rightArm != null) rightArm.localRotation = Quaternion.Slerp(rightArm.localRotation, gkRightArm, dt * 8f);
+
+                    if (torso != null)
+                    {
+                        torso.localPosition = Vector3.Lerp(torso.localPosition, initialTorsoLocalPos + new Vector3(0f, -0.065f + gkBounce, 0f), dt * 8f);
+                        torso.localRotation = Quaternion.Slerp(torso.localRotation, initialTorsoLocalRot * Quaternion.Euler(14.0f, 0f, 0f), dt * 8f);
+                    }
+                }
+                else if (hasBall)
+                {
+                    // Outfield player stationary over the ball: control stance
+                    Quaternion ballControlLeg = initialRightLegRot * Quaternion.Euler(-10f, 0f, 0f);
+                    Quaternion ballControlKnee = initialRightKneeRot * Quaternion.Euler(12f, 0f, 0f);
+
+                    if (leftLeg != null) leftLeg.localRotation = Quaternion.Slerp(leftLeg.localRotation, initialLeftLegRot, dt * 8f);
+                    if (rightLeg != null) rightLeg.localRotation = Quaternion.Slerp(rightLeg.localRotation, ballControlLeg, dt * 8f);
+                    if (leftKnee != null) leftKnee.localRotation = Quaternion.Slerp(leftKnee.localRotation, initialLeftKneeRot, dt * 8f);
+                    if (rightKnee != null) rightKnee.localRotation = Quaternion.Slerp(rightKnee.localRotation, ballControlKnee, dt * 8f);
+                    if (leftArm != null) leftArm.localRotation = Quaternion.Slerp(leftArm.localRotation, initialLeftArmRot * Quaternion.Euler(5f, 0f, 12f), dt * 8f);
+                    if (rightArm != null) rightArm.localRotation = Quaternion.Slerp(rightArm.localRotation, initialRightArmRot * Quaternion.Euler(-5f, 0f, -12f), dt * 8f);
+
+                    if (torso != null)
+                    {
+                        torso.localPosition = Vector3.Lerp(torso.localPosition, initialTorsoLocalPos + new Vector3(0f, -0.025f, 0f), dt * 8f);
+                        torso.localRotation = Quaternion.Slerp(torso.localRotation, initialTorsoLocalRot * Quaternion.Euler(6.0f, 0f, 0f), dt * 8f);
+                    }
+                }
+                else
+                {
+                    // Regular idle breathing, stance balance recovery
+                    float breath = Mathf.Sin(Time.time * 2.2f) * 0.012f;
+
+                    if (leftLeg != null) leftLeg.localRotation = Quaternion.Slerp(leftLeg.localRotation, initialLeftLegRot, dt * 10f);
+                    if (rightLeg != null) rightLeg.localRotation = Quaternion.Slerp(rightLeg.localRotation, initialRightLegRot, dt * 10f);
+                    if (leftKnee != null) leftKnee.localRotation = Quaternion.Slerp(leftKnee.localRotation, initialLeftKneeRot, dt * 10f);
+                    if (rightKnee != null) rightKnee.localRotation = Quaternion.Slerp(rightKnee.localRotation, initialRightKneeRot, dt * 10f);
+                    if (leftArm != null) leftArm.localRotation = Quaternion.Slerp(leftArm.localRotation, initialLeftArmRot, dt * 10f);
+                    if (rightArm != null) rightArm.localRotation = Quaternion.Slerp(rightArm.localRotation, initialRightArmRot, dt * 10f);
+
+                    if (torso != null)
+                    {
+                        torso.localPosition = Vector3.Lerp(torso.localPosition, initialTorsoLocalPos + new Vector3(0f, breath, 0f), dt * 10f);
+                        torso.localRotation = Quaternion.Slerp(torso.localRotation, initialTorsoLocalRot, dt * 8f);
+                    }
                 }
             }
         }

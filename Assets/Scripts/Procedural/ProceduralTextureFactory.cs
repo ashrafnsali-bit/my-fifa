@@ -700,5 +700,81 @@ namespace Football.Procedural
             tex.Apply();
             return tex;
         }
+
+        public static Texture2D CreateArgentinaFlagTexture()
+        {
+            int w = 256, h = 160;
+            var tex = new Texture2D(w, h, TextureFormat.RGBA32, true);
+            tex.wrapMode = TextureWrapMode.Clamp;
+            tex.filterMode = FilterMode.Bilinear;
+
+            Color skyBlue = new Color(0.44f, 0.72f, 0.98f);
+            Color white = new Color(0.98f, 0.98f, 0.98f);
+            Color sunGold = new Color(0.96f, 0.78f, 0.12f);
+            Color sunBrown = new Color(0.70f, 0.45f, 0.10f);
+
+            Color[] pixels = new Color[w * h];
+            Vector2 center = new Vector2(w * 0.5f, h * 0.5f);
+            float sunRadius = h * 0.13f;
+
+            for (int y = 0; y < h; y++)
+            {
+                float ny = (float)y / h;
+                Color stripeCol = (ny < 0.333f || ny > 0.667f) ? skyBlue : white;
+
+                for (int x = 0; x < w; x++)
+                {
+                    Color c = stripeCol;
+                    if (ny >= 0.333f && ny <= 0.667f)
+                    {
+                        float dist = Vector2.Distance(new Vector2(x, y), center);
+                        if (dist <= sunRadius)
+                        {
+                            c = (dist >= sunRadius - 1.2f) ? sunBrown : sunGold;
+                        }
+                        else if (dist <= sunRadius * 1.85f)
+                        {
+                            float angle = Mathf.Atan2(y - center.y, x - center.x);
+                            float ray = Mathf.Sin(angle * 16f);
+                            if (ray > 0.55f && dist <= sunRadius * (1.1f + ray * 0.75f))
+                            {
+                                c = sunGold;
+                            }
+                        }
+                    }
+                    pixels[y * w + x] = c;
+                }
+            }
+            tex.SetPixels(pixels);
+            tex.Apply();
+            return tex;
+        }
+
+        public static Texture2D CreateFranceFlagTexture()
+        {
+            int w = 256, h = 160;
+            var tex = new Texture2D(w, h, TextureFormat.RGBA32, true);
+            tex.wrapMode = TextureWrapMode.Clamp;
+            tex.filterMode = FilterMode.Bilinear;
+
+            Color blue = new Color(0.00f, 0.14f, 0.58f);
+            Color white = new Color(0.98f, 0.98f, 0.98f);
+            Color red = new Color(0.93f, 0.11f, 0.14f);
+
+            Color[] pixels = new Color[w * h];
+
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    float nx = (float)x / w;
+                    Color c = (nx < 0.333f) ? blue : ((nx < 0.667f) ? white : red);
+                    pixels[y * w + x] = c;
+                }
+            }
+            tex.SetPixels(pixels);
+            tex.Apply();
+            return tex;
+        }
     }
 }

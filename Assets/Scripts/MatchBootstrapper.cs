@@ -163,13 +163,13 @@ public class MatchBootstrapper : MonoBehaviour
             dirLight.type = LightType.Directional;
         }
 
-        dirLight.transform.rotation = Quaternion.Euler(56f, -38f, 0f);
-        dirLight.intensity = 1.45f;
-        dirLight.color = new Color(1.0f, 0.98f, 0.93f);
+        dirLight.transform.rotation = Quaternion.Euler(58f, -36f, 0f);
+        dirLight.intensity = 1.85f;
+        dirLight.color = new Color(1.0f, 0.98f, 0.95f);
         dirLight.shadows = LightShadows.Soft;
 
         RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-        RenderSettings.ambientLight = new Color(0.48f, 0.54f, 0.65f);
+        RenderSettings.ambientLight = new Color(0.34f, 0.38f, 0.48f); // Rich evening stadium sky ambient
 
         // Global Post-Processing Volume for broadcast television glow and ACES tonemapping
         var volume = FindFirstObjectByType<UnityEngine.Rendering.Volume>();
@@ -199,8 +199,8 @@ public class MatchBootstrapper : MonoBehaviour
         var builder = pitchObj.AddComponent<ProceduralPitchBuilder>();
 
         // High-definition procedural turf with blade noise
-        Material lightTurf = CreateLitMaterial(new Color(0.22f, 0.58f, 0.24f), 0.30f);
-        Material darkTurf = CreateLitMaterial(new Color(0.16f, 0.48f, 0.18f), 0.30f);
+        Material lightTurf = CreateLitMaterial(new Color(0.22f, 0.58f, 0.24f), 0.35f);
+        Material darkTurf = CreateLitMaterial(new Color(0.16f, 0.48f, 0.18f), 0.35f);
 
         var grassTex1 = ProceduralTextureFactory.CreateTurfGrassTexture(new Color(0.22f, 0.58f, 0.24f), new Color(0.26f, 0.65f, 0.28f));
         var grassTex2 = ProceduralTextureFactory.CreateTurfGrassTexture(new Color(0.16f, 0.48f, 0.18f), new Color(0.19f, 0.53f, 0.21f));
@@ -217,55 +217,6 @@ public class MatchBootstrapper : MonoBehaviour
         builder.goalFrameMaterial = CreateLitMaterial(new Color(0.96f, 0.96f, 0.96f), 0.85f);
 
         builder.BuildCompletePitch();
-
-        // Build stadium perimeter LED advertising hoardings
-        BuildPerimeterBoards(pitchObj.transform);
-    }
-
-    private void BuildPerimeterBoards(Transform parent)
-    {
-        GameObject boardsRoot = new GameObject("AdBoards");
-        boardsRoot.transform.SetParent(parent, false);
-
-        Material boardMat = CreateLitMaterial(new Color(0.08f, 0.10f, 0.16f), 0.85f);
-        var ledTex = ProceduralTextureFactory.CreateLEDAdTexture();
-        if (boardMat.HasProperty("_BaseMap")) boardMat.SetTexture("_BaseMap", ledTex);
-        else if (boardMat.HasProperty("_MainTex")) boardMat.SetTexture("_MainTex", ledTex);
-
-        if (boardMat.HasProperty("_EmissionColor"))
-        {
-            boardMat.EnableKeyword("_EMISSION");
-            boardMat.SetColor("_EmissionColor", Color.white * 1.5f);
-            boardMat.SetTexture("_EmissionMap", ledTex);
-        }
-
-        float w = PitchConstants.HalfWidth + 3.0f;
-        float l = PitchConstants.HalfLength + 3.0f;
-        float h = 0.95f;
-
-        // Sideline boards
-        CreateBoardQuad(boardsRoot.transform, new Vector3(-w, h * 0.5f, 0f), new Vector3(0.2f, h, PitchConstants.PitchLength + 8f), boardMat);
-        CreateBoardQuad(boardsRoot.transform, new Vector3(w, h * 0.5f, 0f), new Vector3(0.2f, h, PitchConstants.PitchLength + 8f), boardMat);
-
-        // Endline boards
-        float goalHalfGap = PitchConstants.GoalWidth * 0.5f + 2.5f;
-        float cornerW = (PitchConstants.PitchWidth - goalHalfGap * 2f) * 0.5f;
-
-        CreateBoardQuad(boardsRoot.transform, new Vector3(-w + cornerW * 0.5f, h * 0.5f, -l), new Vector3(cornerW, h, 0.2f), boardMat);
-        CreateBoardQuad(boardsRoot.transform, new Vector3(w - cornerW * 0.5f, h * 0.5f, -l), new Vector3(cornerW, h, 0.2f), boardMat);
-        CreateBoardQuad(boardsRoot.transform, new Vector3(-w + cornerW * 0.5f, h * 0.5f, l), new Vector3(cornerW, h, 0.2f), boardMat);
-        CreateBoardQuad(boardsRoot.transform, new Vector3(w - cornerW * 0.5f, h * 0.5f, l), new Vector3(cornerW, h, 0.2f), boardMat);
-    }
-
-    private void CreateBoardQuad(Transform parent, Vector3 pos, Vector3 scale, Material mat)
-    {
-        GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        cube.name = "AdBoard";
-        cube.transform.SetParent(parent, false);
-        cube.transform.position = pos;
-        cube.transform.localScale = scale;
-        Object.DestroyImmediate(cube.GetComponent<Collider>());
-        cube.GetComponent<MeshRenderer>().sharedMaterial = mat;
     }
 
     private FootballBall SetupMatchBall()
