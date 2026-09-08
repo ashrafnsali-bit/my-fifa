@@ -1,5 +1,6 @@
 using UnityEngine;
 using Football.Core;
+using Football.PhysicsEngine;
 
 namespace Football.Locomotion
 {
@@ -325,7 +326,7 @@ namespace Football.Locomotion
         {
             if (head == null) return;
 
-            var ball = FootballBall.Instance;
+            var ball = Football.PhysicsEngine.FootballBall.Instance;
             if (ball != null)
             {
                 Vector3 toBall = ball.transform.position - head.position;
