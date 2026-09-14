@@ -776,5 +776,218 @@ namespace Football.Procedural
             tex.Apply();
             return tex;
         }
+
+        public static Texture2D CreateTurfNormalMap(int size = 512)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, true);
+            tex.wrapMode = TextureWrapMode.Repeat;
+            tex.filterMode = FilterMode.Trilinear;
+
+            float[,] heights = new float[size, size];
+            for (int y = 0; y < size; y++)
+            {
+                float ny = (float)y / size;
+                for (int x = 0; x < size; x++)
+                {
+                    float nx = (float)x / size;
+                    float blade1 = Mathf.Sin(nx * 480f) * Mathf.Cos(ny * 180f) * 0.5f;
+                    float blade2 = Mathf.Sin((nx + ny) * 240f) * 0.25f;
+                    float noise = Mathf.PerlinNoise(nx * 60f, ny * 60f) * 0.25f;
+                    heights[x, y] = blade1 + blade2 + noise;
+                }
+            }
+
+            Color[] pixels = new Color[size * size];
+            float strength = 0.8f;
+            for (int y = 0; y < size; y++)
+            {
+                int yPrev = (y - 1 + size) % size;
+                int yNext = (y + 1) % size;
+                for (int x = 0; x < size; x++)
+                {
+                    int xPrev = (x - 1 + size) % size;
+                    int xNext = (x + 1) % size;
+
+                    float dX = (heights[xNext, y] - heights[xPrev, y]) * strength;
+                    float dY = (heights[x, yNext] - heights[x, yPrev]) * strength;
+
+                    Vector3 n = new Vector3(-dX, -dY, 1.0f).normalized;
+                    pixels[y * size + x] = new Color(n.x * 0.5f + 0.5f, n.y * 0.5f + 0.5f, n.z * 0.5f + 0.5f, 1.0f);
+                }
+            }
+
+            tex.SetPixels(pixels);
+            tex.Apply();
+            return tex;
+        }
+
+        public static Texture2D CreateBallNormalMap(int size = 512)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, true);
+            tex.wrapMode = TextureWrapMode.Clamp;
+            tex.filterMode = FilterMode.Trilinear;
+
+            float[,] heights = new float[size, size];
+            for (int y = 0; y < size; y++)
+            {
+                float ny = (float)y / size;
+                for (int x = 0; x < size; x++)
+                {
+                    float nx = (float)x / size;
+                    float seam = Mathf.Sin(nx * 32f) * Mathf.Cos(ny * 32f);
+                    float seamHeight = (Mathf.Abs(seam) > 0.92f) ? -0.7f : 0.0f;
+                    float dimples = Mathf.Sin(nx * 160f) * Mathf.Sin(ny * 160f) * 0.12f;
+                    heights[x, y] = seamHeight + dimples;
+                }
+            }
+
+            Color[] pixels = new Color[size * size];
+            float strength = 3.5f;
+            for (int y = 0; y < size; y++)
+            {
+                int yPrev = Mathf.Max(0, y - 1);
+                int yNext = Mathf.Min(size - 1, y + 1);
+                for (int x = 0; x < size; x++)
+                {
+                    int xPrev = Mathf.Max(0, x - 1);
+                    int xNext = Mathf.Min(size - 1, x + 1);
+
+                    float dX = (heights[xNext, y] - heights[xPrev, y]) * strength;
+                    float dY = (heights[x, yNext] - heights[x, yPrev]) * strength;
+
+                    Vector3 n = new Vector3(-dX, -dY, 1.0f).normalized;
+                    pixels[y * size + x] = new Color(n.x * 0.5f + 0.5f, n.y * 0.5f + 0.5f, n.z * 0.5f + 0.5f, 1.0f);
+                }
+            }
+
+            tex.SetPixels(pixels);
+            tex.Apply();
+            return tex;
+        }
+
+        public static Texture2D CreateFabricNormalMap(int size = 256)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, true);
+            tex.wrapMode = TextureWrapMode.Repeat;
+            tex.filterMode = FilterMode.Trilinear;
+
+            Color[] pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                float ny = (float)y / size;
+                for (int x = 0; x < size; x++)
+                {
+                    float nx = (float)x / size;
+                    float weaveX = Mathf.Sin(nx * 140f * Mathf.PI);
+                    float weaveY = Mathf.Cos(ny * 140f * Mathf.PI);
+
+                    Vector3 n = new Vector3(weaveX * 0.22f, weaveY * 0.22f, 1.0f).normalized;
+                    pixels[y * size + x] = new Color(n.x * 0.5f + 0.5f, n.y * 0.5f + 0.5f, n.z * 0.5f + 0.5f, 1.0f);
+                }
+            }
+
+            tex.SetPixels(pixels);
+            tex.Apply();
+            return tex;
+        }
+
+        public static Texture2D CreateSquadNumberTexture(int number, Color numColor)
+        {
+            int w = 128, h = 128;
+            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+            tex.wrapMode = TextureWrapMode.Clamp;
+            tex.filterMode = FilterMode.Bilinear;
+
+            Color[] pixels = new Color[w * h];
+            for (int i = 0; i < pixels.Length; i++) pixels[i] = Color.clear;
+
+            string numStr = number.ToString();
+            int numDigits = numStr.Length;
+            int digitW = 28;
+            int digitH = 46;
+            int startX = (w - (numDigits * (digitW + 6) - 6)) / 2;
+            int startY = (h - digitH) / 2;
+
+            short[] digitMasks = new short[]
+            {
+                0x7B6F, // 0
+                0x2492, // 1
+                0x73E7, // 2
+                0x73CF, // 3
+                0x5BC9, // 4
+                0x79CF, // 5
+                0x79EF, // 6
+                0x7249, // 7
+                0x7BEF, // 8
+                0x7BCF  // 9
+            };
+
+            for (int d = 0; d < numDigits; d++)
+            {
+                int digit = numStr[d] - '0';
+                if (digit < 0 || digit > 9) continue;
+                short mask = digitMasks[digit];
+                int curX = startX + d * (digitW + 6);
+
+                for (int row = 0; row < 5; row++)
+                {
+                    for (int col = 0; col < 3; col++)
+                    {
+                        int bitIndex = 14 - (row * 3 + col);
+                        bool isSolid = ((mask >> bitIndex) & 1) == 1;
+                        if (!isSolid) continue;
+
+                        int blockXMin = curX + (col * digitW) / 3;
+                        int blockXMax = curX + ((col + 1) * digitW) / 3;
+                        int blockYMin = startY + ((4 - row) * digitH) / 5;
+                        int blockYMax = startY + ((5 - row) * digitH) / 5;
+
+                        for (int py = blockYMin; py < blockYMax && py < h; py++)
+                        {
+                            for (int px = blockXMin; px < blockXMax && px < w; px++)
+                            {
+                                pixels[py * w + px] = numColor;
+                            }
+                        }
+                    }
+                }
+            }
+
+            tex.SetPixels(pixels);
+            tex.Apply();
+            return tex;
+        }
+
+        public static Texture2D CreateBlobShadowTexture(int size = 128)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, true);
+            tex.wrapMode = TextureWrapMode.Clamp;
+            tex.filterMode = FilterMode.Bilinear;
+
+            Color[] pixels = new Color[size * size];
+            Vector2 center = new Vector2(0.5f, 0.5f);
+
+            for (int y = 0; y < size; y++)
+            {
+                float ny = (float)y / size;
+                for (int x = 0; x < size; x++)
+                {
+                    float nx = (float)x / size;
+                    // Distance from center: slightly wider on X for natural stance
+                    float dx = (nx - center.x) * 1.8f;
+                    float dy = (ny - center.y) * 2.2f;
+                    float dist = Mathf.Sqrt(dx * dx + dy * dy);
+
+                    float alpha = Mathf.Clamp01(1.0f - dist);
+                    alpha = Mathf.SmoothStep(0f, 1f, alpha) * 0.45f;
+
+                    pixels[y * size + x] = new Color(0.02f, 0.05f, 0.02f, alpha);
+                }
+            }
+
+            tex.SetPixels(pixels);
+            tex.Apply();
+            return tex;
+        }
     }
 }

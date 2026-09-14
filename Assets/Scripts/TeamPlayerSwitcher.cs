@@ -129,11 +129,7 @@ public class TeamPlayerSwitcher : MonoBehaviour
             var p = teamPlayers[i];
             if (p == null || p.isSentOff) continue;
 
-            // Let goalkeeper hold ball safely in hands and punt it out to outfield teammates
-            if (p.attributes != null && p.attributes.position == PlayerPosition.GK && p.isHoldingBallInHands)
-            {
-                continue;
-            }
+            // We now allow the user to switch to the Goalkeeper so they can manually choose when to kick the ball.
 
             if (p.hasBall || Vector3.Distance(p.transform.position, ballPos) < 1.6f)
             {

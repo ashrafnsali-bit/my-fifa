@@ -1,6 +1,8 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using Football.Core;
+using Football.Data;
 using Football.PhysicsEngine;
 using Football.Locomotion;
 
@@ -94,21 +96,189 @@ namespace Football.Engine
                 FootballBall.Instance.ResetPosition(kickoffPos + Vector3.up * 0.11f);
             }
 
-            yield return new WaitForSeconds(1.5f);
+            // Position at least 2 players for the kicking team (kickoff taker and partner)
+            var players = FindObjectsByType<PlayerRuntimeState>(FindObjectsSortMode.None);
+            PlayerRuntimeState kickoffTaker = null;
+            PlayerRuntimeState kickoffPartner = null;
+            float closestDist1 = 999f;
+            float closestDist2 = 999f;
+
+            foreach (var p in players)
+            {
+                if (p.teamId == kickingTeamId && !p.isSentOff && p.attributes != null && p.attributes.position != PlayerPosition.GK)
+                {
+                    float d = Vector3.Distance(p.transform.position, kickoffPos);
+                    if (d < closestDist1)
+                    {
+                        closestDist2 = closestDist1;
+                        kickoffPartner = kickoffTaker;
+
+                        closestDist1 = d;
+                        kickoffTaker = p;
+                    }
+                    else if (d < closestDist2)
+                    {
+                        closestDist2 = d;
+                        kickoffPartner = p;
+                    }
+                }
+            }
+
+            if (kickoffTaker != null)
+            {
+                Vector3 takerOffset = (kickingTeamId == 1) ? Vector3.back * 0.95f : Vector3.forward * 0.95f;
+                kickoffTaker.transform.position = kickoffPos + takerOffset;
+                kickoffTaker.transform.rotation = Quaternion.LookRotation(-takerOffset, Vector3.up);
+            }
+
+            if (kickoffPartner != null)
+            {
+                Vector3 partnerOffset = (kickingTeamId == 1) ? (Vector3.back * 1.3f + Vector3.right * 1.9f) : (Vector3.forward * 1.3f + Vector3.left * 1.9f);
+                kickoffPartner.transform.position = kickoffPos + partnerOffset;
+                Vector3 toBall = (kickoffPos - kickoffPartner.transform.position).normalized;
+                kickoffPartner.transform.rotation = Quaternion.LookRotation(toBall, Vector3.up);
+            }
+
+            // Position at least 2 players for the defending team at the edge of the center circle
+            int defendingTeamId = (kickingTeamId == 1) ? 2 : 1;
+            PlayerRuntimeState defPlayer1 = null;
+            PlayerRuntimeState defPlayer2 = null;
+            float defDist1 = 999f;
+            float defDist2 = 999f;
+
+            foreach (var p in players)
+            {
+                if (p.teamId == defendingTeamId && !p.isSentOff && p.attributes != null && p.attributes.position != PlayerPosition.GK)
+                {
+                    float d = Vector3.Distance(p.transform.position, kickoffPos);
+                    if (d < defDist1)
+                    {
+                        defDist2 = defDist1;
+                        defPlayer2 = defPlayer1;
+
+                        defDist1 = d;
+                        defPlayer1 = p;
+                    }
+                    else if (d < defDist2)
+                    {
+                        defDist2 = d;
+                        defPlayer2 = p;
+                    }
+                }
+            }
+
+            if (defPlayer1 != null)
+            {
+                Vector3 defOffset = (defendingTeamId == 1) ? (Vector3.back * 9.5f + Vector3.left * 2.8f) : (Vector3.forward * 9.5f + Vector3.right * 2.8f);
+                defPlayer1.transform.position = kickoffPos + defOffset;
+                Vector3 toCenter = (kickoffPos - defPlayer1.transform.position).normalized;
+                defPlayer1.transform.rotation = Quaternion.LookRotation(toCenter, Vector3.up);
+            }
+
+            if (defPlayer2 != null)
+            {
+                Vector3 defOffset = (defendingTeamId == 1) ? (Vector3.back * 9.5f + Vector3.right * 2.8f) : (Vector3.forward * 9.5f + Vector3.left * 2.8f);
+                defPlayer2.transform.position = kickoffPos + defOffset;
+                Vector3 toCenter = (kickoffPos - defPlayer2.transform.position).normalized;
+                defPlayer2.transform.rotation = Quaternion.LookRotation(toCenter, Vector3.up);
+            }
+
+            if (kickingTeamId == 2)
+            {
+                // AI opponent kickoff: wait briefly then pass backwards
+                yield return new WaitForSeconds(1.6f);
+                if (FootballBall.Instance != null)
+                {
+                    Vector3 passDir = (PitchConstants.GetDefendingGoalCenter(2) - kickoffPos).normalized;
+                    passDir.y = 0f;
+                    FootballBall.Instance.Kick(passDir * 5.5f, Vector3.zero, 9, 2);
+                }
+            }
+            else
+            {
+                // Human team kickoff: wait for user order / input, or auto-start after 2.5 seconds
+                float waitTimer = 0f;
+                bool userTriggered = false;
+                while (!userTriggered && waitTimer < 2.5f)
+                {
+                    waitTimer += Time.deltaTime;
+                    var keyboard = Keyboard.current;
+                    var gamepad = Gamepad.current;
+
+                    if (keyboard != null)
+                    {
+                        if (keyboard.spaceKey.wasPressedThisFrame || keyboard.enterKey.wasPressedThisFrame ||
+                            keyboard.wKey.wasPressedThisFrame || keyboard.sKey.wasPressedThisFrame ||
+                            keyboard.aKey.wasPressedThisFrame || keyboard.dKey.wasPressedThisFrame ||
+                            keyboard.upArrowKey.wasPressedThisFrame || keyboard.downArrowKey.wasPressedThisFrame ||
+                            keyboard.leftArrowKey.wasPressedThisFrame || keyboard.rightArrowKey.wasPressedThisFrame)
+                        {
+                            userTriggered = true;
+                        }
+                    }
+
+                    if (Input.anyKeyDown || Mathf.Abs(Input.GetAxis("Horizontal")) > 0.1f || Mathf.Abs(Input.GetAxis("Vertical")) > 0.1f)
+                    {
+                        userTriggered = true;
+                    }
+
+                    if (gamepad != null)
+                    {
+                        if (gamepad.buttonSouth.wasPressedThisFrame || gamepad.buttonWest.wasPressedThisFrame ||
+                            gamepad.buttonEast.wasPressedThisFrame || gamepad.buttonNorth.wasPressedThisFrame ||
+                            gamepad.leftStick.ReadValue().sqrMagnitude > 0.15f)
+                        {
+                            userTriggered = true;
+                        }
+                    }
+
+                    yield return null;
+                }
+
+                if (FootballBall.Instance != null && FootballBall.Instance.Velocity.magnitude < 0.2f)
+                {
+                    FootballBall.Instance.Kick(Vector3.forward * 5.0f, Vector3.zero, 10, 1);
+                }
+            }
 
             ChangeState(MatchState.InPlay);
             isClockRunning = true;
         }
 
+        private float lastGoalScoredTime = -10f;
+
         private void HandleGoalScored(int scoringTeamId, Vector3 ballPosition)
         {
+            // Safeguard 1: Ignore if already in GoalScored state (prevents multi-counting while ball is in net)
+            if (currentState == MatchState.GoalScored)
+            {
+                return;
+            }
+
+            // Safeguard 2: Cooldown check (at least 4.0 seconds between any goal events)
+            if (Time.time - lastGoalScoredTime < 4.0f)
+            {
+                return;
+            }
+
+            lastGoalScoredTime = Time.time;
             isClockRunning = false;
             ChangeState(MatchState.GoalScored);
 
+            // Exactly 1 goal counted per valid score
             if (scoringTeamId == 1) homeScore++;
             else awayScore++;
 
+            Debug.Log($"<color=yellow><b>[GOAL AWARDED]</b> Team {scoringTeamId} scored! Official score: {homeScore} - {awayScore}</color>");
+
             GameEvents.TriggerScoreUpdated(homeScore, awayScore);
+
+            // Settle ball inside the net
+            if (FootballBall.Instance != null && FootballBall.Instance.BallRigidbody != null)
+            {
+                FootballBall.Instance.BallRigidbody.linearVelocity = FootballBall.Instance.BallRigidbody.linearVelocity * 0.2f;
+                FootballBall.Instance.BallRigidbody.angularVelocity = Vector3.zero;
+            }
 
             // Restart match from kickoff (conceding team kicks off)
             int nextKickoffTeam = (scoringTeamId == 1) ? 2 : 1;
@@ -120,7 +290,7 @@ namespace Football.Engine
             yield return new WaitForSeconds(3.5f);
 
             // Reset all players to formation anchors
-            var players = FindObjectsOfType<FootballPlayerLocomotion>();
+            var players = FindObjectsByType<FootballPlayerLocomotion>(FindObjectsSortMode.None);
             foreach (var p in players)
             {
                 p.ResetPosition();
@@ -139,12 +309,24 @@ namespace Football.Engine
                 FootballBall.Instance.ResetPosition(restartPos + Vector3.up * 0.11f);
             }
 
-            StartCoroutine(ResumePlayAfterSetPiece());
+            StartCoroutine(ResumePlayAfterSetPiece(pieceType, restartPos, teamId));
         }
 
-        private IEnumerator ResumePlayAfterSetPiece()
+        private IEnumerator ResumePlayAfterSetPiece(MatchState pieceType, Vector3 restartPos, int teamId)
         {
-            yield return new WaitForSeconds(2.0f);
+            yield return new WaitForSeconds(1.5f);
+
+            // Re-kick ball into play automatically towards pitch center / teammates so game NEVER stops!
+            if (FootballBall.Instance != null)
+            {
+                Vector3 targetDir = (Vector3.zero - restartPos).normalized;
+                targetDir.y = 0f;
+                Vector3 attackDir = PitchConstants.GetTargetGoalCenter(teamId);
+                Vector3 kickDir = Vector3.Lerp(targetDir, (attackDir - restartPos).normalized, 0.40f).normalized;
+                kickDir.y = 0.08f;
+                FootballBall.Instance.Kick(kickDir.normalized * 8.5f, Vector3.zero, 10, teamId);
+            }
+
             ChangeState(MatchState.InPlay);
             isClockRunning = true;
         }
@@ -162,7 +344,7 @@ namespace Football.Engine
                 FootballBall.Instance.ResetPosition(restartPos + Vector3.up * 0.11f);
             }
 
-            StartCoroutine(ResumePlayAfterSetPiece());
+            StartCoroutine(ResumePlayAfterSetPiece(isPenalty ? MatchState.PenaltyKick : MatchState.FreeKick, restartPos, takingTeam));
         }
 
         private void EndCurrentHalf()
@@ -191,7 +373,7 @@ namespace Football.Engine
             elapsedHalfSeconds = 0f;
 
             // Reset players & kickoff for 2nd half (Away team kicks off)
-            var players = FindObjectsOfType<FootballPlayerLocomotion>();
+            var players = FindObjectsByType<FootballPlayerLocomotion>(FindObjectsSortMode.None);
             foreach (var p in players)
             {
                 p.ResetPosition();

@@ -31,7 +31,7 @@ namespace Football.Engine
         public void EvaluateFoulDiscipline(int offendingTeamId, Vector3 foulPos, bool isPenalty)
         {
             // Find offending player closest to foul position
-            var players = FindObjectsOfType<PlayerRuntimeState>();
+            var players = FindObjectsByType<PlayerRuntimeState>(FindObjectsSortMode.None);
             PlayerRuntimeState culprit = null;
             float closestDist = float.MaxValue;
 

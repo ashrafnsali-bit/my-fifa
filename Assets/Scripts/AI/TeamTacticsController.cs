@@ -32,6 +32,7 @@ namespace Football.Tactics
         [Header("Roster References")]
         public List<FootballAIPlayer> teamPlayers = new List<FootballAIPlayer>();
         public FootballAIPlayer closestPlayerToBall { get; private set; }
+        public FootballAIPlayer secondClosestPlayerToBall { get; private set; }
 
         private FormationSlot[] formationSlots;
 
@@ -57,7 +58,9 @@ namespace Football.Tactics
 
             Vector3 ballPos = ball.transform.position;
             float closestSqrDist = float.MaxValue;
+            float secondClosestSqrDist = float.MaxValue;
             FootballAIPlayer bestPlayer = null;
+            FootballAIPlayer secondBestPlayer = null;
 
             foreach (var p in teamPlayers)
             {
@@ -67,20 +70,22 @@ namespace Football.Tactics
                 float sqrDist = (p.transform.position - ballPos).sqrMagnitude;
                 if (sqrDist < closestSqrDist)
                 {
+                    secondClosestSqrDist = closestSqrDist;
+                    secondBestPlayer = bestPlayer;
+
                     closestSqrDist = sqrDist;
                     bestPlayer = p;
                 }
+                else if (sqrDist < secondClosestSqrDist)
+                {
+                    secondClosestSqrDist = sqrDist;
+                    secondBestPlayer = p;
+                }
             }
 
-            // Only press if ball is within 18 meters; otherwise hold tactical formation shape
-            if (closestSqrDist <= 18f * 18f)
-            {
-                closestPlayerToBall = bestPlayer;
-            }
-            else
-            {
-                closestPlayerToBall = null;
-            }
+            // The two closest outfield players always actively support and challenge around the ball
+            closestPlayerToBall = bestPlayer;
+            secondClosestPlayerToBall = secondBestPlayer;
         }
 
         private void UpdatePlayerTacticalAnchors()

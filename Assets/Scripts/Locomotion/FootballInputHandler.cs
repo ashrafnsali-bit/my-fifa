@@ -31,7 +31,25 @@ namespace Football.Locomotion
             var keyboard = Keyboard.current;
             var gamepad = Gamepad.current;
 
-            // 1. Read Keyboard input
+            // 1. Unified robust input reading (New Input System + Legacy Input fallback)
+            bool spaceDown = (keyboard != null && keyboard.spaceKey.wasPressedThisFrame) || Input.GetKeyDown(KeyCode.Space);
+            bool spaceHeld = (keyboard != null && keyboard.spaceKey.isPressed) || Input.GetKey(KeyCode.Space);
+            bool spaceUp = (keyboard != null && keyboard.spaceKey.wasReleasedThisFrame) || Input.GetKeyUp(KeyCode.Space);
+
+            bool lDown = (keyboard != null && keyboard.lKey.wasPressedThisFrame) || Input.GetKeyDown(KeyCode.L) || (gamepad != null && gamepad.buttonEast.wasPressedThisFrame);
+            bool lHeld = (keyboard != null && keyboard.lKey.isPressed) || Input.GetKey(KeyCode.L) || (gamepad != null && gamepad.buttonEast.isPressed);
+            bool lUp = (keyboard != null && keyboard.lKey.wasReleasedThisFrame) || Input.GetKeyUp(KeyCode.L) || (gamepad != null && gamepad.buttonEast.wasReleasedThisFrame);
+
+            bool jDown = (keyboard != null && keyboard.jKey.wasPressedThisFrame) || Input.GetKeyDown(KeyCode.J) || (gamepad != null && gamepad.buttonSouth.wasPressedThisFrame);
+            bool jUp = (keyboard != null && keyboard.jKey.wasReleasedThisFrame) || Input.GetKeyUp(KeyCode.J) || (gamepad != null && gamepad.buttonSouth.wasReleasedThisFrame);
+
+            bool kDown = (keyboard != null && keyboard.kKey.wasPressedThisFrame) || Input.GetKeyDown(KeyCode.K) || (gamepad != null && gamepad.buttonWest.wasPressedThisFrame);
+            bool kUp = (keyboard != null && keyboard.kKey.wasReleasedThisFrame) || Input.GetKeyUp(KeyCode.K) || (gamepad != null && gamepad.buttonWest.wasReleasedThisFrame);
+
+            bool iDown = (keyboard != null && keyboard.iKey.wasPressedThisFrame) || Input.GetKeyDown(KeyCode.I) || (gamepad != null && gamepad.buttonNorth.wasPressedThisFrame);
+            bool iUp = (keyboard != null && keyboard.iKey.wasReleasedThisFrame) || Input.GetKeyUp(KeyCode.I) || (gamepad != null && gamepad.buttonNorth.wasReleasedThisFrame);
+
+            // Read directional movement from Keyboard
             if (keyboard != null)
             {
                 if (keyboard.wKey.isPressed || keyboard.upArrowKey.isPressed) moveInput.y += 1f;
@@ -45,7 +63,17 @@ namespace Football.Locomotion
                 }
             }
 
-            // 2. Read Gamepad input
+            // Legacy Input fallback for movement
+            if (moveInput == Vector2.zero)
+            {
+                if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) moveInput.y += 1f;
+                if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) moveInput.y -= 1f;
+                if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) moveInput.x += 1f;
+                if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) moveInput.x -= 1f;
+                if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) sprintHeld = true;
+            }
+
+            // Read Gamepad input
             if (gamepad != null)
             {
                 Vector2 stick = gamepad.leftStick.ReadValue();
@@ -84,55 +112,45 @@ namespace Football.Locomotion
 
             Vector3 aimDir = worldMoveDir.sqrMagnitude > 0.05f ? worldMoveDir.normalized : transform.forward;
 
-            var ball = FootballBall.Instance;
-            float distToBall = (ball != null) ? Vector3.Distance(transform.position, ball.transform.position) : 99f;
-            bool isInPossession = runtimeState.hasBall || distToBall < 2.5f;
+            var ball = FootballBall.Instance ?? FindFirstObjectByType<FootballBall>();
+            Vector3 toBall = ball != null ? (ball.transform.position - transform.position) : Vector3.zero;
+            toBall.y = 0f;
+            float distToBall = ball != null ? toBall.magnitude : 99f;
+            bool isInPossession = runtimeState.hasBall || distToBall < 3.8f;
+
+            bool kickDown = spaceDown || lDown;
+            bool kickHeld = spaceHeld || lHeld;
+            bool kickUp = spaceUp || lUp;
 
             if (isInPossession)
             {
-                HandlePossessionInput(aimDir, keyboard, gamepad);
+                HandlePossessionInput(aimDir, keyboard, kickDown, kickHeld, kickUp, jDown, jUp, kDown, kUp, iDown, iUp);
             }
             else
             {
-                HandleDefendingInput(keyboard, gamepad);
+                HandleDefendingInput(aimDir, distToBall, kickDown, kickUp, kDown);
             }
         }
 
-        private void HandlePossessionInput(Vector3 aimDir, Keyboard keyboard, Gamepad gamepad)
+        private void HandlePossessionInput(Vector3 aimDir, Keyboard keyboard, bool kickDown, bool kickHeld, bool kickUp, bool passDown, bool passUp, bool lobDown, bool lobUp, bool throughDown, bool throughUp)
         {
-            bool shootDown = (keyboard != null && keyboard.lKey.wasPressedThisFrame) ||
-                             (gamepad != null && gamepad.buttonEast.wasPressedThisFrame);
-            bool shootUp = (keyboard != null && keyboard.lKey.wasReleasedThisFrame) ||
-                           (gamepad != null && gamepad.buttonEast.wasReleasedThisFrame);
-
-            bool passDown = (keyboard != null && (keyboard.jKey.wasPressedThisFrame || keyboard.spaceKey.wasPressedThisFrame)) ||
-                            (gamepad != null && gamepad.buttonSouth.wasPressedThisFrame);
-            bool passUp = (keyboard != null && (keyboard.jKey.wasReleasedThisFrame || keyboard.spaceKey.wasReleasedThisFrame)) ||
-                          (gamepad != null && gamepad.buttonSouth.wasReleasedThisFrame);
-
-            bool lobDown = (keyboard != null && keyboard.kKey.wasPressedThisFrame) ||
-                           (gamepad != null && gamepad.buttonWest.wasPressedThisFrame);
-            bool lobUp = (keyboard != null && keyboard.kKey.wasReleasedThisFrame) ||
-                         (gamepad != null && gamepad.buttonWest.wasReleasedThisFrame);
-
-            bool throughDown = (keyboard != null && keyboard.iKey.wasPressedThisFrame) ||
-                               (gamepad != null && gamepad.buttonNorth.wasPressedThisFrame);
-            bool throughUp = (keyboard != null && keyboard.iKey.wasReleasedThisFrame) ||
-                             (gamepad != null && gamepad.buttonNorth.wasReleasedThisFrame);
-
-            // --- Shooting ---
-            if (shootDown) actions.StartShotCharge();
-            if (shootUp)
+            // --- Shooting / Powerful Kick (Spacebar / L Key) ---
+            if (kickDown)
             {
-                ShotType shotType = ShotType.Standard;
-                if (keyboard != null && (keyboard.leftAltKey.isPressed || keyboard.rKey.isPressed)) shotType = ShotType.Finesse;
-                else if (keyboard != null && keyboard.leftCtrlKey.isPressed) shotType = ShotType.Chip;
-                else if (locomotion.IsSprinting) shotType = ShotType.Power;
-
-                actions.ReleaseShot(shotType, aimDir);
+                actions.StartShotCharge();
             }
 
-            // --- Ground Passing ---
+            // Auto-release if fully charged
+            if (kickHeld && actions.CurrentPowerRatio >= 0.99f)
+            {
+                ExecuteReleaseShot(aimDir, keyboard);
+            }
+            else if (kickUp)
+            {
+                ExecuteReleaseShot(aimDir, keyboard);
+            }
+
+            // --- Ground Passing (J Key) ---
             if (passDown) actions.StartPassCharge();
             if (passUp)
             {
@@ -144,7 +162,7 @@ namespace Football.Locomotion
                 }
             }
 
-            // --- Lobbed Pass / Cross ---
+            // --- Lobbed Pass / Cross (K Key) ---
             if (lobDown) actions.StartPassCharge();
             if (lobUp)
             {
@@ -156,7 +174,7 @@ namespace Football.Locomotion
                 }
             }
 
-            // --- Through Ball ---
+            // --- Through Ball (I Key) ---
             if (throughDown) actions.StartPassCharge();
             if (throughUp)
             {
@@ -167,6 +185,25 @@ namespace Football.Locomotion
                     GameEvents.TriggerPassInitiated(runtimeState.teamId, target);
                 }
             }
+        }
+
+        private void ExecuteReleaseShot(Vector3 aimDir, Keyboard keyboard)
+        {
+            ShotType shotType = ShotType.Standard;
+            if ((keyboard != null && (keyboard.leftAltKey.isPressed || keyboard.rKey.isPressed)) || Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.R))
+            {
+                shotType = ShotType.Finesse;
+            }
+            else if ((keyboard != null && keyboard.leftCtrlKey.isPressed) || Input.GetKey(KeyCode.LeftControl))
+            {
+                shotType = ShotType.Chip;
+            }
+            else if (locomotion.IsSprinting)
+            {
+                shotType = ShotType.Power;
+            }
+
+            actions.ReleaseShot(shotType, aimDir);
         }
 
         private Transform FindTeammateInDirection(Vector3 aimDir)
@@ -212,19 +249,22 @@ namespace Football.Locomotion
             return bestTeammate ?? fallbackTeammate;
         }
 
-        private void HandleDefendingInput(Keyboard keyboard, Gamepad gamepad)
+        private void HandleDefendingInput(Vector3 aimDir, float distToBall, bool kickDown, bool kickUp, bool slidePress)
         {
-            // Standing Tackle (Keycode L / Button B / Circle)
-            bool tacklePress = (keyboard != null && keyboard.lKey.wasPressedThisFrame) ||
-                               (gamepad != null && gamepad.buttonEast.wasPressedThisFrame);
-            if (tacklePress)
+            // If player presses Spacebar/L near ball while defending, perform an instant powerful clearance kick/shot towards goal!
+            if ((kickDown || kickUp) && distToBall <= 4.2f)
+            {
+                actions.ExecuteShot(ShotType.Power, aimDir, 0.85f);
+                return;
+            }
+
+            // Standing Tackle if further away
+            if (kickDown)
             {
                 actions.ExecuteStandingTackle();
             }
 
             // Slide Tackle (Keycode K / Button X / Square)
-            bool slidePress = (keyboard != null && keyboard.kKey.wasPressedThisFrame) ||
-                              (gamepad != null && gamepad.buttonWest.wasPressedThisFrame);
             if (slidePress)
             {
                 actions.ExecuteSlideTackle();

@@ -30,7 +30,7 @@ namespace Football.Presentation
             if (radarPitchRect == null) return;
 
             // Find all active players on pitch
-            allPlayers.AddRange(FindObjectsOfType<PlayerRuntimeState>());
+            allPlayers.AddRange(FindObjectsByType<PlayerRuntimeState>(FindObjectsSortMode.None));
 
             if (homeBlipTemplate != null) homeBlipTemplate.gameObject.SetActive(false);
             if (awayBlipTemplate != null) awayBlipTemplate.gameObject.SetActive(false);

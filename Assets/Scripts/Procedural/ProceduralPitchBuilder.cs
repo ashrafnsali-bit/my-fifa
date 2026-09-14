@@ -43,20 +43,37 @@ namespace Football.Procedural
             GameObject turfRoot = new GameObject("TurfSurface");
             turfRoot.transform.SetParent(transform, false);
 
+            var turfNormal = ProceduralTextureFactory.CreateTurfNormalMap();
+            Vector2 stripeTiling = new Vector2(8f, 2f);
+
             if (turfMaterialLight == null)
             {
-                turfMaterialLight = StadiumArchitect.CreateMaterial(new Color(0.20f, 0.54f, 0.24f), 0.35f);
+                turfMaterialLight = StadiumArchitect.CreateMaterial(new Color(0.20f, 0.56f, 0.24f), 0.28f);
                 var texLight = ProceduralTextureFactory.CreateTurfGrassTexture(new Color(0.22f, 0.58f, 0.26f), new Color(0.18f, 0.50f, 0.22f));
-                if (turfMaterialLight.HasProperty("_BaseMap")) turfMaterialLight.SetTexture("_BaseMap", texLight);
-                else if (turfMaterialLight.HasProperty("_MainTex")) turfMaterialLight.SetTexture("_MainTex", texLight);
+                if (turfMaterialLight.HasProperty("_BaseMap")) { turfMaterialLight.SetTexture("_BaseMap", texLight); turfMaterialLight.SetTextureScale("_BaseMap", stripeTiling); }
+                else if (turfMaterialLight.HasProperty("_MainTex")) { turfMaterialLight.SetTexture("_MainTex", texLight); turfMaterialLight.SetTextureScale("_MainTex", stripeTiling); }
             }
+            if (turfMaterialLight.HasProperty("_BumpMap"))
+            {
+                turfMaterialLight.SetTexture("_BumpMap", turfNormal);
+                turfMaterialLight.SetTextureScale("_BumpMap", stripeTiling);
+                turfMaterialLight.EnableKeyword("_NORMALMAP");
+            }
+
             if (turfMaterialDark == null)
             {
-                turfMaterialDark = StadiumArchitect.CreateMaterial(new Color(0.15f, 0.44f, 0.18f), 0.35f);
+                turfMaterialDark = StadiumArchitect.CreateMaterial(new Color(0.15f, 0.46f, 0.18f), 0.28f);
                 var texDark = ProceduralTextureFactory.CreateTurfGrassTexture(new Color(0.17f, 0.48f, 0.20f), new Color(0.13f, 0.40f, 0.16f));
-                if (turfMaterialDark.HasProperty("_BaseMap")) turfMaterialDark.SetTexture("_BaseMap", texDark);
-                else if (turfMaterialDark.HasProperty("_MainTex")) turfMaterialDark.SetTexture("_MainTex", texDark);
+                if (turfMaterialDark.HasProperty("_BaseMap")) { turfMaterialDark.SetTexture("_BaseMap", texDark); turfMaterialDark.SetTextureScale("_BaseMap", stripeTiling); }
+                else if (turfMaterialDark.HasProperty("_MainTex")) { turfMaterialDark.SetTexture("_MainTex", texDark); turfMaterialDark.SetTextureScale("_MainTex", stripeTiling); }
             }
+            if (turfMaterialDark.HasProperty("_BumpMap"))
+            {
+                turfMaterialDark.SetTexture("_BumpMap", turfNormal);
+                turfMaterialDark.SetTextureScale("_BumpMap", stripeTiling);
+                turfMaterialDark.EnableKeyword("_NORMALMAP");
+            }
+
             if (lineMaterial == null)
             {
                 lineMaterial = StadiumArchitect.CreateMaterial(new Color(0.98f, 0.98f, 0.98f), 0.15f);
@@ -255,13 +272,16 @@ namespace Football.Procedural
             if (netMat.HasProperty("_BaseMap")) netMat.SetTexture("_BaseMap", netTex);
             else if (netMat.HasProperty("_MainTex")) netMat.SetTexture("_MainTex", netTex);
 
-            // Back Net Wall
+            // Back Net Wall (equipped with solid non-penetrating BoxCollider and absorbing PhysicMaterial)
             GameObject backNet = GameObject.CreatePrimitive(PrimitiveType.Cube);
             backNet.name = "BackNet";
             backNet.transform.SetParent(goalObj.transform, false);
             backNet.transform.position = new Vector3(0f, postHeight * 0.5f, rearZ);
             backNet.transform.localScale = new Vector3(PitchConstants.GoalWidth, postHeight, 0.05f);
-            DestroyImmediate(backNet.GetComponent<Collider>());
+            var backCol = backNet.GetComponent<BoxCollider>();
+            backCol.sharedMaterial = GetNetPhysicMaterial();
+            backCol.size = new Vector3(PitchConstants.GoalWidth + 0.4f, postHeight + 0.3f, 0.40f);
+            backCol.center = new Vector3(0f, 0f, -facingDir * 0.18f); // Extends outward behind visual mesh
             backNet.GetComponent<MeshRenderer>().sharedMaterial = netMat;
 
             // Top Net Roof (sloping from crossbar to rear stanchion)
@@ -270,7 +290,10 @@ namespace Football.Procedural
             topNet.transform.SetParent(goalObj.transform, false);
             topNet.transform.position = new Vector3(0f, postHeight * 0.95f, (goalLineZ + rearZ) * 0.5f);
             topNet.transform.localScale = new Vector3(PitchConstants.GoalWidth, 0.05f, netDepth);
-            DestroyImmediate(topNet.GetComponent<Collider>());
+            var topCol = topNet.GetComponent<BoxCollider>();
+            topCol.sharedMaterial = GetNetPhysicMaterial();
+            topCol.size = new Vector3(PitchConstants.GoalWidth + 0.4f, 0.40f, netDepth);
+            topCol.center = new Vector3(0f, 0.18f, 0f); // Extends upwards above visual mesh
             topNet.GetComponent<MeshRenderer>().sharedMaterial = netMat;
 
             // Left & Right Net Side Walls
@@ -279,7 +302,10 @@ namespace Football.Procedural
             leftNet.transform.SetParent(goalObj.transform, false);
             leftNet.transform.position = new Vector3(-halfW, postHeight * 0.5f, (goalLineZ + rearZ) * 0.5f);
             leftNet.transform.localScale = new Vector3(0.05f, postHeight, netDepth);
-            DestroyImmediate(leftNet.GetComponent<Collider>());
+            var leftCol = leftNet.GetComponent<BoxCollider>();
+            leftCol.sharedMaterial = GetNetPhysicMaterial();
+            leftCol.size = new Vector3(0.40f, postHeight + 0.3f, netDepth);
+            leftCol.center = new Vector3(-0.18f, 0f, 0f); // Extends outwards to left
             leftNet.GetComponent<MeshRenderer>().sharedMaterial = netMat;
 
             GameObject rightNet = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -287,8 +313,43 @@ namespace Football.Procedural
             rightNet.transform.SetParent(goalObj.transform, false);
             rightNet.transform.position = new Vector3(halfW, postHeight * 0.5f, (goalLineZ + rearZ) * 0.5f);
             rightNet.transform.localScale = new Vector3(0.05f, postHeight, netDepth);
-            DestroyImmediate(rightNet.GetComponent<Collider>());
+            var rightCol = rightNet.GetComponent<BoxCollider>();
+            rightCol.sharedMaterial = GetNetPhysicMaterial();
+            rightCol.size = new Vector3(0.40f, postHeight + 0.3f, netDepth);
+            rightCol.center = new Vector3(0.18f, 0f, 0f); // Extends outwards to right
             rightNet.GetComponent<MeshRenderer>().sharedMaterial = netMat;
+
+            // Goal Net Catchment & Energy Absorption Chamber (absorbs ball momentum & guarantees zero penetration)
+            GameObject catchmentObj = new GameObject("GoalNetCatchment");
+            catchmentObj.transform.SetParent(goalObj.transform, false);
+            catchmentObj.transform.position = new Vector3(0f, postHeight * 0.5f, (goalLineZ + rearZ) * 0.5f);
+            var catchCol = catchmentObj.AddComponent<BoxCollider>();
+            catchCol.isTrigger = true;
+            catchCol.size = new Vector3(PitchConstants.GoalWidth + 0.3f, postHeight + 0.2f, netDepth + 0.3f);
+
+            var netDampener = catchmentObj.AddComponent<GoalNetDampener>();
+            netDampener.facingDir = facingDir;
+            netDampener.goalLineZ = goalLineZ;
+            netDampener.rearZ = rearZ;
+            netDampener.halfWidth = halfW;
+            netDampener.goalHeight = postHeight;
+        }
+
+        private static PhysicsMaterial s_NetPhysMat;
+        public static PhysicsMaterial GetNetPhysicMaterial()
+        {
+            if (s_NetPhysMat == null)
+            {
+                s_NetPhysMat = new PhysicsMaterial("GoalNetAbsorber")
+                {
+                    bounciness = 0.01f,
+                    dynamicFriction = 0.95f,
+                    staticFriction = 0.95f,
+                    bounceCombine = PhysicsMaterialCombine.Minimum,
+                    frictionCombine = PhysicsMaterialCombine.Maximum
+                };
+            }
+            return s_NetPhysMat;
         }
 
         private void CreatePostCylinder(Transform parent, string name, Vector3 pos, float radius, float height)
@@ -307,14 +368,141 @@ namespace Football.Procedural
     public class GoalDetector : MonoBehaviour
     {
         public int defendingTeamId = 1;
+        private float lastGoalTime = -10f;
 
         private void OnTriggerEnter(Collider other)
         {
-            if (other.name.Contains("Ball") || (other.attachedRigidbody != null && other.attachedRigidbody.name.Contains("Ball")))
+            // Only detect goals when match is actively in play
+            if (GameEvents.CurrentMatchState != MatchState.InPlay)
             {
+                return;
+            }
+
+            // Cooldown prevents multiple triggers while ball bounces in the net
+            if (Time.time - lastGoalTime < 4.0f)
+            {
+                return;
+            }
+
+            if (other.name.Contains("Ball") || (other.attachedRigidbody != null && other.attachedRigidbody.name.Contains("Ball")) || other.CompareTag("Ball"))
+            {
+                lastGoalTime = Time.time;
                 int scoringTeam = (defendingTeamId == 1) ? 2 : 1;
                 GameEvents.TriggerGoalScored(scoringTeam, other.transform.position);
             }
+        }
+    }
+
+    /// <summary>
+    /// Authentically absorbs the football's kinetic energy inside the goal net pocket,
+    /// preventing the ball from penetrating through the mesh or ricocheting back out of the net,
+    /// dropping it realistically onto the turf inside the goal.
+    /// </summary>
+    public class GoalNetDampener : MonoBehaviour
+    {
+        public int facingDir = 1; // 1 = Home (faces +Z), -1 = Away (faces -Z)
+        public float goalLineZ;
+        public float rearZ;
+        public float halfWidth = 3.66f;
+        public float goalHeight = 2.44f;
+
+        private void OnTriggerEnter(Collider other)
+        {
+            Rigidbody rb = other.attachedRigidbody;
+            if (rb == null || !IsBall(other, rb)) return;
+
+            // 1. Initial Net Impact Absorption:
+            // Flexible cord mesh absorbs majority of momentum immediately upon striking net pocket
+            Vector3 v = rb.linearVelocity;
+            v.x *= 0.30f;
+            v.z *= 0.30f;
+            v.y = Mathf.Min(v.y, 0.8f) * 0.4f;
+            rb.linearVelocity = v;
+            rb.angularVelocity *= 0.25f;
+
+            // Trigger net ripple sound event
+            GameEvents.TriggerGoalNetHit();
+        }
+
+        private void OnTriggerStay(Collider other)
+        {
+            Rigidbody rb = other.attachedRigidbody;
+            if (rb == null || !IsBall(other, rb)) return;
+
+            Vector3 v = rb.linearVelocity;
+            Vector3 pos = rb.position;
+            const float ballRadius = 0.11f;
+            const float safetyMargin = 0.04f;
+
+            // 1. Rapidly bleed residual kinetic velocity & settle softly to grass:
+            v.x *= 0.80f;
+            v.z *= 0.80f;
+            if (v.y > 0.05f) v.y *= 0.4f;
+            v.y -= 4.0f * Time.fixedDeltaTime; // gentle downward gravitational settling
+
+            // 2. Strict Anti-Penetration Guard (Ball can NEVER cross the net mesh boundaries):
+            // Rear net boundary:
+            if (facingDir == 1) // Home goal: goal line is -52.5, rear is -54.9
+            {
+                float minZ = rearZ + ballRadius + safetyMargin;
+                if (pos.z < minZ)
+                {
+                    pos.z = minZ;
+                    if (v.z < 0f) v.z = 0f;
+                }
+            }
+            else // Away goal: goal line is +52.5, rear is +54.9
+            {
+                float maxZ = rearZ - ballRadius - safetyMargin;
+                if (pos.z > maxZ)
+                {
+                    pos.z = maxZ;
+                    if (v.z > 0f) v.z = 0f;
+                }
+            }
+
+            // Left & Right net side walls barrier:
+            float maxSide = halfWidth - ballRadius - safetyMargin;
+            if (Mathf.Abs(pos.x) > maxSide)
+            {
+                pos.x = Mathf.Sign(pos.x) * maxSide;
+                if (Mathf.Sign(v.x) == Mathf.Sign(pos.x)) v.x = 0f;
+            }
+
+            // Top net roof barrier:
+            float maxRoof = goalHeight - ballRadius - safetyMargin;
+            if (pos.y > maxRoof)
+            {
+                pos.y = maxRoof;
+                if (v.y > 0f) v.y = -0.3f;
+            }
+
+            // Prevent ball from bouncing back out of the net into the field:
+            if (facingDir == 1)
+            {
+                if (pos.z > goalLineZ - 0.25f && v.z > 0.8f)
+                {
+                    v.z = 0.2f;
+                }
+            }
+            else
+            {
+                if (pos.z < goalLineZ + 0.25f && v.z < -0.8f)
+                {
+                    v.z = -0.2f;
+                }
+            }
+
+            rb.position = pos;
+            rb.linearVelocity = v;
+            rb.angularVelocity *= 0.70f;
+        }
+
+        private bool IsBall(Collider other, Rigidbody rb)
+        {
+            return other.CompareTag("Ball") || 
+                   other.name.Contains("Ball") || 
+                   (rb != null && rb.name.Contains("Ball"));
         }
     }
 }

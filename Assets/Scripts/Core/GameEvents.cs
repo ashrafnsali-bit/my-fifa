@@ -73,11 +73,18 @@ namespace Football.Core
         public static event Action<int, Transform> OnPassInitiated; // teamId, targetTeammate
         public static event Action<int, bool> OnTackleExecuted; // teamId, wasSuccessful
         public static event Action OnWoodworkHit;
+        public static event Action OnGoalNetHit;
         public static event Action<int> OnGoalkeeperSave; // savingTeamId
         public static event Action<float> OnCrowdExcitementChanged; // 0.0 to 1.0 intensity
 
+        public static MatchState CurrentMatchState { get; set; } = MatchState.KickOff;
+
         // Dispatchers
-        public static void TriggerMatchStateChanged(MatchState newState) => OnMatchStateChanged?.Invoke(newState);
+        public static void TriggerMatchStateChanged(MatchState newState)
+        {
+            CurrentMatchState = newState;
+            OnMatchStateChanged?.Invoke(newState);
+        }
         public static void TriggerScoreUpdated(int home, int away) => OnScoreUpdated?.Invoke(home, away);
         public static void TriggerGoalScored(int teamId, Vector3 pos) => OnGoalScored?.Invoke(teamId, pos);
         public static void TriggerHalfCompleted(int half) => OnHalfCompleted?.Invoke(half);
@@ -94,6 +101,7 @@ namespace Football.Core
         public static void TriggerPassInitiated(int teamId, Transform targetTeammate) => OnPassInitiated?.Invoke(teamId, targetTeammate);
         public static void TriggerTackleExecuted(int teamId, bool success) => OnTackleExecuted?.Invoke(teamId, success);
         public static void TriggerWoodworkHit() => OnWoodworkHit?.Invoke();
+        public static void TriggerGoalNetHit() => OnGoalNetHit?.Invoke();
         public static void TriggerGoalkeeperSave(int teamId) => OnGoalkeeperSave?.Invoke(teamId);
         public static void TriggerCrowdExcitement(float intensity) => OnCrowdExcitementChanged?.Invoke(Mathf.Clamp01(intensity));
     }

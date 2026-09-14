@@ -23,12 +23,30 @@ public class TeamAI : MonoBehaviour
     void Start()
     {
         initialPos = defaultPosition != null ? defaultPosition.position : transform.position;
-        ball = FindObjectOfType<Ball>();
+        ball = FindFirstObjectByType<Ball>();
     }
 
     void FixedUpdate()
     {
         if (ball == null) return;
+
+        // RULE: If the opponent's goalkeeper is holding the ball, retreat to starting position.
+        // Attacking the GK while he has the ball is illegal in football!
+        var allStates = FindObjectsByType<Football.Locomotion.PlayerRuntimeState>(FindObjectsSortMode.None);
+        foreach (var p in allStates)
+        {
+            // opponentGoal is used as team-identifier: if our opponentGoal != null and the GK
+            // belongs to the opposing team (different opponentGoal direction) and holds the ball
+            if (p != null && p.isHoldingBallInHands)
+            {
+                // Move back to initial position while GK holds ball
+                Vector3 toInit = initialPos - transform.position;
+                toInit.y = 0;
+                if (toInit.magnitude > 0.5f)
+                    rb.MovePosition(rb.position + toInit.normalized * moveSpeed * Time.fixedDeltaTime);
+                return;
+            }
+        }
 
         // Calculate distance ignoring height
         Vector3 ballPosH = new Vector3(ball.transform.position.x, 0, ball.transform.position.z);
@@ -37,7 +55,23 @@ public class TeamAI : MonoBehaviour
         float distanceToBall = Vector3.Distance(myPosH, ballPosH);
         Vector3 targetPos;
 
-        if (distanceToBall <= chaseRadius)
+        // Check if this player is the closest to the ball in their team
+        bool isClosest = true;
+        TeamAI[] allAI = FindObjectsByType<TeamAI>(FindObjectsSortMode.None);
+        foreach (var ai in allAI)
+        {
+            if (ai != this && ai.opponentGoal == this.opponentGoal)
+            {
+                Vector3 aiPosH = new Vector3(ai.transform.position.x, 0, ai.transform.position.z);
+                if (Vector3.Distance(aiPosH, ballPosH) < distanceToBall)
+                {
+                    isClosest = false;
+                    break;
+                }
+            }
+        }
+
+        if (distanceToBall <= chaseRadius && (isClosest || distanceToBall < 3.0f))
         {
             targetPos = ball.transform.position;
         }
@@ -65,6 +99,13 @@ public class TeamAI : MonoBehaviour
 
     private void OnCollisionEnter(Collision collision)
     {
+        // Do NOT kick the ball if any goalkeeper is currently holding it!
+        var allStates = FindObjectsByType<Football.Locomotion.PlayerRuntimeState>(FindObjectsSortMode.None);
+        foreach (var p in allStates)
+        {
+            if (p != null && p.isHoldingBallInHands) return;
+        }
+
         if (collision.gameObject.name.Contains("Ball") || collision.gameObject.GetComponent<Football.PhysicsEngine.FootballBall>() != null || collision.gameObject.GetComponent<Ball>() != null)
         {
             if (ball != null)

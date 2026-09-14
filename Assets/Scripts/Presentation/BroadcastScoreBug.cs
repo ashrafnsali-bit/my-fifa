@@ -56,7 +56,7 @@ namespace Football.Presentation
 
         private void FindHumanPlayerReferences()
         {
-            var inputHandler = FindObjectOfType<FootballInputHandler>();
+            var inputHandler = FindFirstObjectByType<FootballInputHandler>();
             if (inputHandler != null)
             {
                 humanActions = inputHandler.GetComponent<FootballPlayerActions>();
@@ -143,6 +143,15 @@ namespace Football.Presentation
         {
             switch (state)
             {
+                case MatchState.KickOff:
+                    ShowBanner("PRESS SPACE OR [A] TO KICK OFF", 999.0f);
+                    break;
+                case MatchState.InPlay:
+                    if (matchBannerText != null && matchBannerText.text.Contains("KICK OFF"))
+                    {
+                        HideBanner();
+                    }
+                    break;
                 case MatchState.HalfTime:
                     ShowBanner("HALF TIME", 4.0f);
                     break;

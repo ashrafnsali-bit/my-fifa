@@ -144,10 +144,25 @@ public class MatchBootstrapper : MonoBehaviour
                 n.StartsWith("StadiumPitch") ||
                 n.StartsWith("MatchBall") ||
                 n.StartsWith("BroadcastCanvas") ||
-                n.StartsWith("WorldCupStadium"))
+                n.StartsWith("PlayerBlobShadow") ||
+                n.StartsWith("WorldCupStadium") ||
+                n == "Cube" || n == "Cube (1)" || n == "Plane")
             {
                 DestroyImmediate(root);
             }
+        }
+
+        // 3. Clean up any legacy Goal components or GameManagers to prevent conflicting/duplicate score counting
+        var legacyGoals = FindObjectsByType<Goal>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var g in legacyGoals)
+        {
+            if (g != null && g.gameObject != gameObject) DestroyImmediate(g.gameObject);
+        }
+
+        var legacyManagers = FindObjectsByType<GameManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var gm in legacyManagers)
+        {
+            if (gm != null && gm.gameObject != gameObject) DestroyImmediate(gm.gameObject);
         }
     }
 
@@ -163,13 +178,18 @@ public class MatchBootstrapper : MonoBehaviour
             dirLight.type = LightType.Directional;
         }
 
-        dirLight.transform.rotation = Quaternion.Euler(58f, -36f, 0f);
-        dirLight.intensity = 1.85f;
-        dirLight.color = new Color(1.0f, 0.98f, 0.95f);
+        dirLight.transform.rotation = Quaternion.Euler(78f, -10f, 0f); // Overhead stadium illumination so cast shadows land directly below
+        dirLight.intensity = 1.55f;
+        dirLight.color = new Color(1.0f, 0.98f, 0.94f);
         dirLight.shadows = LightShadows.Soft;
+        dirLight.shadowStrength = 0.30f; // Soft, translucent shadows
+        dirLight.shadowBias = 0.08f;
+        dirLight.shadowNormalBias = 0.5f;
 
-        RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-        RenderSettings.ambientLight = new Color(0.34f, 0.38f, 0.48f); // Rich evening stadium sky ambient
+        RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+        RenderSettings.ambientSkyColor = new Color(0.55f, 0.60f, 0.70f);     // Bright sky fill light
+        RenderSettings.ambientEquatorColor = new Color(0.48f, 0.54f, 0.62f); // Stadium horizon fill light
+        RenderSettings.ambientGroundColor = new Color(0.32f, 0.46f, 0.32f);  // Warm grass bounce fill light
 
         // Global Post-Processing Volume for broadcast television glow and ACES tonemapping
         var volume = FindFirstObjectByType<UnityEngine.Rendering.Volume>();
@@ -198,23 +218,28 @@ public class MatchBootstrapper : MonoBehaviour
         GameObject pitchObj = new GameObject("StadiumPitch");
         var builder = pitchObj.AddComponent<ProceduralPitchBuilder>();
 
-        // High-definition procedural turf with blade noise
-        Material lightTurf = CreateLitMaterial(new Color(0.22f, 0.58f, 0.24f), 0.35f);
-        Material darkTurf = CreateLitMaterial(new Color(0.16f, 0.48f, 0.18f), 0.35f);
+        var turfNormal = ProceduralTextureFactory.CreateTurfNormalMap();
+        Vector2 stripeTiling = new Vector2(8f, 2f);
+
+        // High-definition procedural turf with blade normal maps and specular sheen
+        Material lightTurf = CreateLitMaterial(new Color(0.20f, 0.56f, 0.24f), 0.26f, turfNormal);
+        Material darkTurf = CreateLitMaterial(new Color(0.15f, 0.46f, 0.18f), 0.26f, turfNormal);
 
         var grassTex1 = ProceduralTextureFactory.CreateTurfGrassTexture(new Color(0.22f, 0.58f, 0.24f), new Color(0.26f, 0.65f, 0.28f));
         var grassTex2 = ProceduralTextureFactory.CreateTurfGrassTexture(new Color(0.16f, 0.48f, 0.18f), new Color(0.19f, 0.53f, 0.21f));
 
-        if (lightTurf.HasProperty("_BaseMap")) lightTurf.SetTexture("_BaseMap", grassTex1);
-        else if (lightTurf.HasProperty("_MainTex")) lightTurf.SetTexture("_MainTex", grassTex1);
+        if (lightTurf.HasProperty("_BaseMap")) { lightTurf.SetTexture("_BaseMap", grassTex1); lightTurf.SetTextureScale("_BaseMap", stripeTiling); }
+        else if (lightTurf.HasProperty("_MainTex")) { lightTurf.SetTexture("_MainTex", grassTex1); lightTurf.SetTextureScale("_MainTex", stripeTiling); }
+        if (lightTurf.HasProperty("_BumpMap")) lightTurf.SetTextureScale("_BumpMap", stripeTiling);
 
-        if (darkTurf.HasProperty("_BaseMap")) darkTurf.SetTexture("_BaseMap", grassTex2);
-        else if (darkTurf.HasProperty("_MainTex")) darkTurf.SetTexture("_MainTex", grassTex2);
+        if (darkTurf.HasProperty("_BaseMap")) { darkTurf.SetTexture("_BaseMap", grassTex2); darkTurf.SetTextureScale("_BaseMap", stripeTiling); }
+        else if (darkTurf.HasProperty("_MainTex")) { darkTurf.SetTexture("_MainTex", grassTex2); darkTurf.SetTextureScale("_MainTex", stripeTiling); }
+        if (darkTurf.HasProperty("_BumpMap")) darkTurf.SetTextureScale("_BumpMap", stripeTiling);
 
         builder.turfMaterialLight = lightTurf;
         builder.turfMaterialDark = darkTurf;
-        builder.lineMaterial = CreateLitMaterial(new Color(0.98f, 0.98f, 0.98f), 0.15f);
-        builder.goalFrameMaterial = CreateLitMaterial(new Color(0.96f, 0.96f, 0.96f), 0.85f);
+        builder.lineMaterial = CreateLitMaterial(new Color(0.98f, 0.98f, 0.98f), 0.12f);
+        builder.goalFrameMaterial = CreateLitMaterial(new Color(0.96f, 0.96f, 0.96f), 0.88f, null, 0.25f);
 
         builder.BuildCompletePitch();
     }
@@ -229,8 +254,9 @@ public class MatchBootstrapper : MonoBehaviour
         ballObj.transform.position = new Vector3(0f, 0.11f, 0f);
         ballObj.transform.localScale = Vector3.one * (0.11f * 2.0f); // 22cm regulation diameter
 
-        // Official World Cup "Al Rihla" procedural texture mapping
-        Material ballMat = CreateLitMaterial(Color.white, 0.90f);
+        // Official World Cup "Al Rihla" procedural texture with normal-mapped aerodynamic seams
+        var ballNormal = ProceduralTextureFactory.CreateBallNormalMap();
+        Material ballMat = CreateLitMaterial(Color.white, 0.92f, ballNormal);
         var ballTex = ProceduralTextureFactory.CreateAlRihlaBallTexture();
         if (ballMat.HasProperty("_BaseMap")) ballMat.SetTexture("_BaseMap", ballTex);
         else if (ballMat.HasProperty("_MainTex")) ballMat.SetTexture("_MainTex", ballTex);
@@ -261,12 +287,15 @@ public class MatchBootstrapper : MonoBehaviour
         var rig = camObj.GetComponent<BroadcastCameraRig>();
         if (rig == null) rig = camObj.AddComponent<BroadcastCameraRig>();
 
-        // Intimate Broadcast Perspective (close to the player with the ball, strictly horizontal touchlines)
-        rig.sidelineDistance = 33.0f;
-        rig.cameraHeight = 10.8f;
-        rig.baseFieldOfView = 28f;
-        rig.maxFieldOfView = 38f;
-        rig.smoothTime = 0.18f;
+        // Iconic Sideline Broadcast Perspective (locks ball in screen center, strictly horizontal touchlines)
+        rig.lockBallInCenter = true;
+        rig.distanceToBall = 10.5f;
+        rig.sidelineDistance = 10.5f;
+        rig.cameraHeight = 4.8f;
+        rig.baseFieldOfView = 24f;
+        rig.maxFieldOfView = 29f;
+        rig.smoothTime = 0.05f;
+        rig.SnapToBall();
     }
 
     private List<FootballPlayerLocomotion> SpawnTeam(int teamId, string teamName, Color primaryColor, Color secondaryColor, Color gkColor, FormationType formation, bool isHumanTeam)
@@ -283,28 +312,29 @@ public class MatchBootstrapper : MonoBehaviour
             switcher.humanTeamId = teamId;
         }
 
-        // High-definition team national kit materials
-        Material outfieldJerseyMat = CreateLitMaterial(Color.white, 0.35f);
+        // High-definition team national kit materials with fabric normal maps
+        var fabricNormal = ProceduralTextureFactory.CreateFabricNormalMap();
+        Material outfieldJerseyMat = CreateLitMaterial(Color.white, 0.25f, fabricNormal);
         Texture2D kitTex = (teamId == 1) ? ProceduralTextureFactory.CreateArgentinaKitTexture() : ProceduralTextureFactory.CreateFranceKitTexture();
         if (outfieldJerseyMat.HasProperty("_BaseMap")) outfieldJerseyMat.SetTexture("_BaseMap", kitTex);
         else if (outfieldJerseyMat.HasProperty("_MainTex")) outfieldJerseyMat.SetTexture("_MainTex", kitTex);
 
         // Shorts & Socks
-        Material outfieldShortsMat = CreateLitMaterial(teamId == 1 ? new Color(0.12f, 0.12f, 0.14f) : new Color(0.06f, 0.10f, 0.24f), 0.35f);
-        Material outfieldSocksMat = CreateLitMaterial(teamId == 1 ? new Color(0.96f, 0.96f, 0.96f) : new Color(0.88f, 0.12f, 0.16f), 0.25f);
+        Material outfieldShortsMat = CreateLitMaterial(teamId == 1 ? new Color(0.12f, 0.12f, 0.14f) : new Color(0.06f, 0.10f, 0.24f), 0.22f, fabricNormal);
+        Material outfieldSocksMat = CreateLitMaterial(teamId == 1 ? new Color(0.96f, 0.96f, 0.96f) : new Color(0.88f, 0.12f, 0.16f), 0.20f, fabricNormal);
 
         // Goalkeeper kit materials
-        Material gkJerseyMat = CreateLitMaterial(Color.white, 0.45f);
+        Material gkJerseyMat = CreateLitMaterial(Color.white, 0.25f, fabricNormal);
         Texture2D gkTex = ProceduralTextureFactory.CreateGoalkeeperKitTexture(gkColor);
         if (gkJerseyMat.HasProperty("_BaseMap")) gkJerseyMat.SetTexture("_BaseMap", gkTex);
         else if (gkJerseyMat.HasProperty("_MainTex")) gkJerseyMat.SetTexture("_MainTex", gkTex);
 
-        Material gkShortsMat = CreateLitMaterial(gkColor, 0.35f);
-        Material gkSocksMat = CreateLitMaterial(gkColor, 0.25f);
+        Material gkShortsMat = CreateLitMaterial(gkColor, 0.22f, fabricNormal);
+        Material gkSocksMat = CreateLitMaterial(gkColor, 0.20f, fabricNormal);
 
         // Anatomy & Equipment materials
-        Material skinMat = CreateLitMaterial(new Color(0.88f, 0.72f, 0.60f), 0.15f);
-        Material bootsMat = CreateLitMaterial(new Color(0.12f, 0.12f, 0.14f), 0.70f);
+        Material skinMat = CreateLitMaterial(new Color(0.86f, 0.70f, 0.58f), 0.32f);
+        Material bootsMat = CreateLitMaterial(new Color(0.12f, 0.12f, 0.14f), 0.75f, null, 0.40f);
         Material hairMat = CreateLitMaterial(new Color(0.14f, 0.10f, 0.08f), 0.15f);
 
         PlayerRuntimeState defaultHumanPlayer = null;
@@ -359,12 +389,12 @@ public class MatchBootstrapper : MonoBehaviour
             var locomotion = playerObj.AddComponent<FootballPlayerLocomotion>();
             var actions = playerObj.AddComponent<FootballPlayerActions>();
 
-            // 4. Athletic 3D Visual Mesh with limbs, shorts, socks, and styled hair
+            // 4. Athletic 3D Visual Mesh with limbs, shorts, socks, squad number and styled hair
             Material jersey = isGK ? gkJerseyMat : outfieldJerseyMat;
             Material shorts = isGK ? gkShortsMat : outfieldShortsMat;
             Material socks = isGK ? gkSocksMat : outfieldSocksMat;
 
-            BuildPlayerVisuals(playerObj.transform, jersey, shorts, socks, skinMat, bootsMat, hairMat, isGK);
+            BuildPlayerVisuals(playerObj.transform, jersey, shorts, socks, skinMat, bootsMat, hairMat, isGK, jerseyNum, teamId);
 
             playerList.Add(locomotion);
 
@@ -412,9 +442,10 @@ public class MatchBootstrapper : MonoBehaviour
     {
         public Transform hip;
         public Transform knee;
+        public Transform ankle;
     }
 
-    private void BuildPlayerVisuals(Transform parent, Material kitMat, Material shortsMat, Material socksMat, Material skinMat, Material bootsMat, Material hairMat, bool isGK)
+    private void BuildPlayerVisuals(Transform parent, Material kitMat, Material shortsMat, Material socksMat, Material skinMat, Material bootsMat, Material hairMat, bool isGK, int jerseyNum = 0, int teamId = 1)
     {
         // 1. Torso / Jersey
         GameObject torso = GameObject.CreatePrimitive(PrimitiveType.Capsule);
@@ -424,6 +455,36 @@ public class MatchBootstrapper : MonoBehaviour
         torso.transform.localScale = new Vector3(0.56f, 0.48f, 0.38f);
         DestroyImmediate(torso.GetComponent<Collider>());
         torso.GetComponent<MeshRenderer>().sharedMaterial = kitMat;
+
+        // Squad number on back of jersey
+        if (jerseyNum > 0)
+        {
+            GameObject numObj = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            numObj.name = "SquadNumber";
+            numObj.transform.SetParent(torso.transform, false);
+            numObj.transform.localPosition = new Vector3(0f, 0.04f, -0.52f);
+            numObj.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+            numObj.transform.localScale = new Vector3(0.48f, 0.52f, 1f);
+            DestroyImmediate(numObj.GetComponent<Collider>());
+
+            Color numColor = (teamId == 1) ? new Color(0.12f, 0.12f, 0.14f) : Color.white;
+            Texture2D numTex = ProceduralTextureFactory.CreateSquadNumberTexture(jerseyNum, numColor);
+            Material numMat = CreateLitMaterial(Color.white, 0.3f);
+            if (numMat.HasProperty("_BaseMap")) numMat.SetTexture("_BaseMap", numTex);
+            else if (numMat.HasProperty("_MainTex")) numMat.SetTexture("_MainTex", numTex);
+
+            if (numMat.HasProperty("_Surface"))
+            {
+                numMat.SetFloat("_Surface", 1.0f);
+                numMat.SetFloat("_Blend", 0.0f);
+                numMat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                numMat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                numMat.SetInt("_ZWrite", 0);
+                numMat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+                numMat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            }
+            numObj.GetComponent<MeshRenderer>().sharedMaterial = numMat;
+        }
 
         // 2. Shorts / Hips
         GameObject hips = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
@@ -466,10 +527,34 @@ public class MatchBootstrapper : MonoBehaviour
         animator.rightLeg = legR.hip;
         animator.leftKnee = legL.knee;
         animator.rightKnee = legR.knee;
+        animator.leftAnkle = legL.ankle;
+        animator.rightAnkle = legR.ankle;
         animator.leftArm = armL;
         animator.rightArm = armR;
         animator.torso = torso.transform;
         animator.head = head.transform;
+
+        // 7. Grounded Blob Shadow directly under feet (strictly matching player X and Z with 0 offset)
+        GameObject shadowObj = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        shadowObj.name = "PlayerBlobShadow";
+        shadowObj.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+        shadowObj.transform.localScale = new Vector3(1.35f, 1.35f, 1.0f);
+        shadowObj.transform.position = new Vector3(parent.position.x, 0.015f, parent.position.z);
+        DestroyImmediate(shadowObj.GetComponent<Collider>());
+
+        Material shadowMat = CreateBlobShadowMaterial();
+        shadowObj.GetComponent<MeshRenderer>().sharedMaterial = shadowMat;
+
+        var blobShadowScript = shadowObj.AddComponent<BlobShadow>();
+        blobShadowScript.playerTransform = parent;
+        blobShadowScript.groundY = 0.015f;
+
+        var loco = parent.GetComponent<FootballPlayerLocomotion>();
+        if (loco != null)
+        {
+            loco.blobShadow = shadowObj.transform;
+            loco.groundY = 0.015f;
+        }
     }
 
     private Transform CreateArm(Transform parent, string name, Vector3 shoulderPos, Material sleeveMat, Material skinMat, bool isGK)
@@ -538,16 +623,21 @@ public class MatchBootstrapper : MonoBehaviour
         DestroyImmediate(shin.GetComponent<Collider>());
         shin.GetComponent<MeshRenderer>().sharedMaterial = socksMat;
 
-        // Athletic Cleat Boot (child of knee joint below shin)
+        // Ankle Pivot Joint (for professional foot plantarflexion, swing dorsiflexion, and instep angles)
+        GameObject ankleJoint = new GameObject("AnkleJoint");
+        ankleJoint.transform.SetParent(kneeJoint.transform, false);
+        ankleJoint.transform.localPosition = new Vector3(0f, -0.36f, 0f);
+
+        // Athletic Cleat Boot (child of ankle joint so the boot pitches and rotates dynamically at the ankle)
         GameObject boot = GameObject.CreatePrimitive(PrimitiveType.Cube);
         boot.name = "CleatBoot";
-        boot.transform.SetParent(kneeJoint.transform, false);
-        boot.transform.localPosition = new Vector3(0f, -0.36f, 0.08f);
+        boot.transform.SetParent(ankleJoint.transform, false);
+        boot.transform.localPosition = new Vector3(0f, 0f, 0.08f);
         boot.transform.localScale = new Vector3(0.14f, 0.10f, 0.28f);
         DestroyImmediate(boot.GetComponent<Collider>());
         boot.GetComponent<MeshRenderer>().sharedMaterial = bootMat;
 
-        return new PlayerLegJoints { hip = legRoot.transform, knee = kneeJoint.transform };
+        return new PlayerLegJoints { hip = legRoot.transform, knee = kneeJoint.transform, ankle = ankleJoint.transform };
     }
 
     private PlayerOverheadMarker CreatePlayerIndicator(Transform parent, string displayName = "10 MESSI")
@@ -608,7 +698,7 @@ public class MatchBootstrapper : MonoBehaviour
         var guideBg = guideObj.AddComponent<Image>();
         guideBg.color = new Color(0.06f, 0.08f, 0.12f, 0.80f);
 
-        CreateTMPText(guideObj.transform, "<b>WASD</b>: Move | <b>Shift</b>: Sprint\n<b>J / Space</b>: Pass | <b>L</b>: Shoot\n<b>K</b>: Cross/Tackle | <b>I</b>: Through", Vector2.zero, new Vector2(230f, 52f), 11, TextAlignmentOptions.Center, Color.white);
+        CreateTMPText(guideObj.transform, "<b>WASD</b>: Move | <b>Shift</b>: Sprint\n<b>Space / L</b>: Shoot/Kick | <b>J</b>: Pass\n<b>K</b>: Cross/Tackle | <b>I</b>: Through", Vector2.zero, new Vector2(230f, 52f), 11, TextAlignmentOptions.Center, Color.white);
 
         // 3. Modern 2D Minimap Radar (Bottom-Right)
         GameObject radarObj = new GameObject("MinimapRadar");
@@ -701,7 +791,7 @@ public class MatchBootstrapper : MonoBehaviour
         systemsRoot.AddComponent<FootballCommentarySystem>();
     }
 
-    private static Material CreateLitMaterial(Color color, float smoothness = 0.5f)
+    private static Material CreateLitMaterial(Color color, float smoothness = 0.5f, Texture2D normalMap = null, float metallic = 0.0f)
     {
         Shader shader = Shader.Find("Universal Render Pipeline/Lit");
         if (shader == null) shader = Shader.Find("Standard");
@@ -711,6 +801,38 @@ public class MatchBootstrapper : MonoBehaviour
         mat.color = color;
         if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", color);
         if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", smoothness);
+        if (mat.HasProperty("_Metallic")) mat.SetFloat("_Metallic", metallic);
+
+        if (normalMap != null && mat.HasProperty("_BumpMap"))
+        {
+            mat.SetTexture("_BumpMap", normalMap);
+            mat.EnableKeyword("_NORMALMAP");
+        }
+        return mat;
+    }
+
+    private static Material CreateBlobShadowMaterial()
+    {
+        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+        if (shader == null) shader = Shader.Find("Unlit/Transparent");
+        if (shader == null) shader = Shader.Find("Standard");
+
+        Material mat = new Material(shader);
+        Texture2D tex = ProceduralTextureFactory.CreateBlobShadowTexture();
+
+        if (mat.HasProperty("_BaseMap")) mat.SetTexture("_BaseMap", tex);
+        else if (mat.HasProperty("_MainTex")) mat.SetTexture("_MainTex", tex);
+
+        if (mat.HasProperty("_Surface"))
+        {
+            mat.SetFloat("_Surface", 1.0f); // Transparent
+            mat.SetFloat("_Blend", 0.0f);   // Alpha
+            mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            mat.SetInt("_ZWrite", 0);
+            mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+            mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        }
         return mat;
     }
 }

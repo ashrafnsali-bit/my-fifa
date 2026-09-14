@@ -21,6 +21,9 @@ namespace Football.Audio
         public AudioClip whistleClip;
         public AudioClip kickBallClip;
         public AudioClip woodworkHitClip;
+        public AudioClip netRustleClip;
+
+        public AudioClip slideTackleClip;
 
         [Header("Excitement Curve Tuning")]
         [Range(0f, 1f)] public float currentExcitement = 0.1f;
@@ -31,7 +34,20 @@ namespace Football.Audio
             if (Instance == null) Instance = this;
             else if (Instance != this) Destroy(gameObject);
 
+            InitializeProceduralAudioClips();
             SetupAudioSources();
+        }
+
+        private void InitializeProceduralAudioClips()
+        {
+            if (kickBallClip == null) kickBallClip = ProceduralAudioFactory.CreateKickBallClip();
+            if (whistleClip == null) whistleClip = ProceduralAudioFactory.CreateRefereeWhistleClip();
+            if (woodworkHitClip == null) woodworkHitClip = ProceduralAudioFactory.CreateWoodworkHitClip();
+            if (netRustleClip == null) netRustleClip = ProceduralAudioFactory.CreateNetRustleClip();
+            if (goalRoarClip == null) goalRoarClip = ProceduralAudioFactory.CreateGoalRoarClip();
+            if (nearMissGaspClip == null) nearMissGaspClip = ProceduralAudioFactory.CreateNearMissGaspClip();
+            if (slideTackleClip == null) slideTackleClip = ProceduralAudioFactory.CreateSlideTackleClip();
+            if (foulJeerClip == null) foulJeerClip = ProceduralAudioFactory.CreateNearMissGaspClip();
         }
 
         private void SetupAudioSources()
@@ -43,9 +59,19 @@ namespace Football.Audio
 
             ambientMurmurSource.loop = true;
             ambientMurmurSource.volume = 0.45f;
+            if (ambientMurmurSource.clip == null)
+            {
+                ambientMurmurSource.clip = ProceduralAudioFactory.CreateCrowdMurmurLoop();
+                ambientMurmurSource.Play();
+            }
 
             excitementSwellSource.loop = true;
             excitementSwellSource.volume = 0.0f;
+            if (excitementSwellSource.clip == null)
+            {
+                excitementSwellSource.clip = ProceduralAudioFactory.CreateExcitementSwellLoop();
+                excitementSwellSource.Play();
+            }
 
             oneShotStingerSource.playOnAwake = false;
             foleySource.playOnAwake = false;
@@ -54,17 +80,41 @@ namespace Football.Audio
         private void OnEnable()
         {
             GameEvents.OnGoalScored += HandleGoal;
+            GameEvents.OnGoalNetHit += HandleGoalNetHit;
             GameEvents.OnWoodworkHit += HandleWoodwork;
             GameEvents.OnFoulCalled += HandleFoul;
             GameEvents.OnShotTaken += HandleShot;
+            GameEvents.OnPassInitiated += HandlePass;
+            GameEvents.OnMatchStateChanged += HandleMatchState;
         }
 
         private void OnDisable()
         {
             GameEvents.OnGoalScored -= HandleGoal;
+            GameEvents.OnGoalNetHit -= HandleGoalNetHit;
             GameEvents.OnWoodworkHit -= HandleWoodwork;
             GameEvents.OnFoulCalled -= HandleFoul;
             GameEvents.OnShotTaken -= HandleShot;
+            GameEvents.OnPassInitiated -= HandlePass;
+            GameEvents.OnMatchStateChanged -= HandleMatchState;
+        }
+
+        private void HandleGoalNetHit()
+        {
+            PlayFoley(netRustleClip, 0.85f);
+        }
+
+        private void HandlePass(int teamId, Transform receiver)
+        {
+            PlayFoley(kickBallClip, Random.Range(0.45f, 0.65f));
+        }
+
+        private void HandleMatchState(MatchState state)
+        {
+            if (state == MatchState.InPlay || state == MatchState.HalfTime || state == MatchState.FullTime)
+            {
+                PlayFoley(whistleClip, 0.85f);
+            }
         }
 
         private void Update()

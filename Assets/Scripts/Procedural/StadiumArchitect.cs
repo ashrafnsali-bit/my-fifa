@@ -81,13 +81,13 @@ namespace Football.Procedural
             float pW = PitchConstants.HalfWidth;
             float pL = PitchConstants.HalfLength;
 
-            // Lateral Sideline Grandstands (East & West)
-            BuildStandSection(standsRoot.transform, "Stand_East", new Vector3(pW + 7.5f, 8.5f, 0f), new Vector3(22f, 19f, PitchConstants.PitchLength + 36f), -20f, crowdTier1Mat, crowdTier2Mat, concreteMat, bannerMat, vipGlassMat, argFlagMat, fraFlagMat, phaseOffset: 0.0f);
-            BuildStandSection(standsRoot.transform, "Stand_West", new Vector3(-pW - 12.5f, 8.5f, 0f), new Vector3(22f, 19f, PitchConstants.PitchLength + 36f), 20f, crowdTier1Mat, crowdTier2Mat, concreteMat, bannerMat, vipGlassMat, argFlagMat, fraFlagMat, phaseOffset: 1.5f);
+            // Lateral Sideline Grandstands (East & West) - Set at authentic spacious FIFA World Cup distance
+            BuildStandSection(standsRoot.transform, "Stand_East", new Vector3(pW + 26.0f, 11.5f, 0f), new Vector3(26f, 24f, PitchConstants.PitchLength + 16f), -22f, crowdTier1Mat, crowdTier2Mat, concreteMat, bannerMat, vipGlassMat, argFlagMat, fraFlagMat, phaseOffset: 0.0f);
+            BuildStandSection(standsRoot.transform, "Stand_West", new Vector3(-pW - 28.0f, 11.5f, 0f), new Vector3(26f, 24f, PitchConstants.PitchLength + 16f), 22f, crowdTier1Mat, crowdTier2Mat, concreteMat, bannerMat, vipGlassMat, argFlagMat, fraFlagMat, phaseOffset: 1.5f);
 
-            // Endline Behind-the-Goal Stands (North & South)
-            BuildStandSection(standsRoot.transform, "Stand_South", new Vector3(0f, 8.5f, -pL - 8.5f), new Vector3(PitchConstants.PitchWidth + 36f, 19f, 22f), 0f, crowdTier1Mat, crowdTier2Mat, concreteMat, bannerMat, vipGlassMat, argFlagMat, fraFlagMat, isEndline: true, facingAngle: 20f, phaseOffset: 0.7f);
-            BuildStandSection(standsRoot.transform, "Stand_North", new Vector3(0f, 8.5f, pL + 8.5f), new Vector3(PitchConstants.PitchWidth + 36f, 19f, 22f), 0f, crowdTier1Mat, crowdTier2Mat, concreteMat, bannerMat, vipGlassMat, argFlagMat, fraFlagMat, isEndline: true, facingAngle: -20f, phaseOffset: 2.2f);
+            // Endline Behind-the-Goal Stands (North & South) - Positioned behind goals without overflowing into sideline camera corridor
+            BuildStandSection(standsRoot.transform, "Stand_South", new Vector3(0f, 11.5f, -pL - 28.0f), new Vector3(PitchConstants.PitchWidth + 14f, 24f, 26f), 0f, crowdTier1Mat, crowdTier2Mat, concreteMat, bannerMat, vipGlassMat, argFlagMat, fraFlagMat, isEndline: true, facingAngle: 22f, phaseOffset: 0.7f);
+            BuildStandSection(standsRoot.transform, "Stand_North", new Vector3(0f, 11.5f, pL + 28.0f), new Vector3(PitchConstants.PitchWidth + 14f, 24f, 26f), 0f, crowdTier1Mat, crowdTier2Mat, concreteMat, bannerMat, vipGlassMat, argFlagMat, fraFlagMat, isEndline: true, facingAngle: -22f, phaseOffset: 2.2f);
         }
 
         private static void BuildStandSection(Transform parent, string name, Vector3 pos, Vector3 size, float rotY, Material tier1Mat, Material tier2Mat, Material concreteMat, Material bannerMat, Material vipGlassMat, Material argFlagMat, Material fraFlagMat, bool isEndline = false, float facingAngle = 0f, float phaseOffset = 0f)
@@ -233,9 +233,9 @@ namespace Football.Procedural
             Material beamMat = CreateVolumetricBeamMaterial(new Color(1f, 0.98f, 0.88f, 0.05f));
             Mesh beamMesh = CreateVolumetricBeamMesh(2.2f, 25.0f, 65.0f, 16);
 
-            float cornerX = PitchConstants.HalfWidth + 24.0f;
-            float cornerZ = PitchConstants.HalfLength + 24.0f;
-            float towerHeight = 36.0f;
+            float cornerX = PitchConstants.HalfWidth + 34.0f;
+            float cornerZ = PitchConstants.HalfLength + 34.0f;
+            float towerHeight = 44.0f;
 
             Vector3[] towerPositions = {
                 new Vector3(-cornerX, 0f, -cornerZ),
@@ -278,12 +278,12 @@ namespace Football.Procedural
 
                 var light = spotObj.AddComponent<Light>();
                 light.type = LightType.Spot;
-                light.range = 95f;
-                light.spotAngle = 65f;
-                light.innerSpotAngle = 45f;
-                light.intensity = 8.5f;
-                light.color = new Color(1.0f, 0.98f, 0.92f);
-                light.shadows = LightShadows.None; // Save performance
+                light.range = 140f;
+                light.spotAngle = 72f;
+                light.innerSpotAngle = 38f;
+                light.intensity = 10.0f;
+                light.color = new Color(1.0f, 0.98f, 0.94f);
+                light.shadows = LightShadows.None; // Only main light casts unified clean soft shadow
 
                 // Atmospheric Volumetric Light Shaft Cone
                 var shaftObj = new GameObject("VolumetricLightShaft");
@@ -342,22 +342,22 @@ namespace Football.Procedural
         {
             var roofObj = new GameObject("StadiumCanopyRoof");
             roofObj.transform.SetParent(parent, false);
-            roofObj.transform.position = new Vector3(0f, 22f, 0f);
+            roofObj.transform.position = new Vector3(0f, 26f, 0f);
 
             Material canopyMat = CreateMaterial(new Color(0.94f, 0.95f, 0.96f), 0.4f);
 
-            float pW = PitchConstants.HalfWidth + 24.0f;
-            float pL = PitchConstants.HalfLength + 24.0f;
-            float roofThickness = 0.8f;
-            float roofDepth = 22.0f;
+            float pW = PitchConstants.HalfWidth + 28.0f;
+            float pL = PitchConstants.HalfLength + 28.0f;
+            float roofThickness = 1.0f;
+            float roofDepth = 26.0f;
 
             // East/West Overhangs
-            CreateRoofPanel(roofObj.transform, new Vector3(-pW - 2f, 0f, 0f), new Vector3(roofDepth, roofThickness, PitchConstants.PitchLength + 36f), 12f, canopyMat);
-            CreateRoofPanel(roofObj.transform, new Vector3(pW + 2f, 0f, 0f), new Vector3(roofDepth, roofThickness, PitchConstants.PitchLength + 36f), -12f, canopyMat);
+            CreateRoofPanel(roofObj.transform, new Vector3(-pW, 0f, 0f), new Vector3(roofDepth, roofThickness, PitchConstants.PitchLength + 16f), 12f, canopyMat);
+            CreateRoofPanel(roofObj.transform, new Vector3(pW, 0f, 0f), new Vector3(roofDepth, roofThickness, PitchConstants.PitchLength + 16f), -12f, canopyMat);
 
             // North/South Overhangs
-            CreateRoofPanel(roofObj.transform, new Vector3(0f, 0f, -pL - 2f), new Vector3(PitchConstants.PitchWidth + 36f, roofThickness, roofDepth), 0f, canopyMat, pitchAngle: 12f);
-            CreateRoofPanel(roofObj.transform, new Vector3(0f, 0f, pL + 2f), new Vector3(PitchConstants.PitchWidth + 36f, roofThickness, roofDepth), 0f, canopyMat, pitchAngle: -12f);
+            CreateRoofPanel(roofObj.transform, new Vector3(0f, 0f, -pL), new Vector3(PitchConstants.PitchWidth + 16f, roofThickness, roofDepth), 0f, canopyMat, pitchAngle: 12f);
+            CreateRoofPanel(roofObj.transform, new Vector3(0f, 0f, pL), new Vector3(PitchConstants.PitchWidth + 16f, roofThickness, roofDepth), 0f, canopyMat, pitchAngle: -12f);
         }
 
         private static void CreateRoofPanel(Transform parent, Vector3 pos, Vector3 scale, float rollAngle, Material mat, float pitchAngle = 0f)
@@ -378,8 +378,8 @@ namespace Football.Procedural
             apronObj.transform.SetParent(parent, false);
 
             Material apronTurf = CreateMaterial(new Color(0.14f, 0.42f, 0.16f), 0.2f);
-            float apronW = PitchConstants.PitchWidth + 12f;
-            float apronL = PitchConstants.PitchLength + 14f;
+            float apronW = PitchConstants.PitchWidth + 24f;
+            float apronL = PitchConstants.PitchLength + 26f;
 
             // Artificial turf border surrounding the pitch
             var apronPlane = GameObject.CreatePrimitive(PrimitiveType.Cube);

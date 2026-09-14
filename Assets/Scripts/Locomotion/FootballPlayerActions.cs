@@ -79,19 +79,19 @@ namespace Football.Locomotion
         public void StartShotCharge()
         {
             var ball = FootballBall.Instance;
-            float dist = ball != null ? Vector3.Distance(transform.position, ball.transform.position) : 99f;
-            if (!runtimeState.hasBall && dist > 3.0f) return;
+            Vector3 toBall = ball != null ? (ball.transform.position - transform.position) : Vector3.zero;
+            toBall.y = 0;
+            float dist = toBall.magnitude;
+            if (!runtimeState.hasBall && dist > 4.2f) return;
 
             isChargingShot = true;
-            currentPowerCharge = 0f;
+            currentPowerCharge = 0.25f;
         }
 
         public void ReleaseShot(ShotType type, Vector3 aimDirection)
         {
-            if (!isChargingShot) return;
+            float power = Mathf.Max(currentPowerCharge, 0.45f);
             isChargingShot = false;
-
-            float power = currentPowerCharge;
             currentPowerCharge = 0f;
 
             ExecuteShot(type, aimDirection, power);
@@ -102,6 +102,14 @@ namespace Football.Locomotion
             var ball = FootballBall.Instance;
             if (ball == null) return;
 
+            // RULE: Cannot shoot the ball while it is held in the goalkeeper's hands!
+            var allPlayers = FindObjectsByType<PlayerRuntimeState>(FindObjectsSortMode.None);
+            foreach (var p in allPlayers)
+            {
+                if (p != null && p.isHoldingBallInHands && p.teamId != runtimeState.teamId)
+                    return; // Ball is protected - opponent GK has possession!
+            }
+
             // Goalkeeper punts with foot if holding ball in hands
             if (runtimeState.isHoldingBallInHands)
             {
@@ -109,8 +117,10 @@ namespace Football.Locomotion
                 return;
             }
 
-            float dist = Vector3.Distance(transform.position, ball.transform.position);
-            if (dist > 3.5f) return;
+            Vector3 diff = ball.transform.position - transform.position;
+            diff.y = 0;
+            float dist = diff.magnitude;
+            if (dist > 4.2f) return;
 
             int shotPowerAttr = runtimeState.attributes != null ? runtimeState.attributes.shotPower : 75;
             int curveAttr = runtimeState.attributes != null ? runtimeState.attributes.curve : 70;
@@ -122,6 +132,7 @@ namespace Football.Locomotion
 
             Vector3 kickDir = aimDirection.sqrMagnitude > 0.1f ? aimDirection : (targetGoal - transform.position).normalized;
             kickDir.y = 0f;
+            kickDir.Normalize();
 
             Vector3 initialVelocity;
             Vector3 spinAngularVelocity = Vector3.zero;
@@ -169,8 +180,16 @@ namespace Football.Locomotion
                 anim.TriggerKickAnimation(rightFoot);
             }
 
+            // Clean ball displacement to separate cleanly from feet/collider
+            ball.transform.position += kickDir * 0.35f;
+
             ball.Kick(initialVelocity, spinAngularVelocity, runtimeState.jerseyNumber, runtimeState.teamId);
             runtimeState.hasBall = false;
+
+            if (locomotion != null)
+            {
+                locomotion.OnBallKicked(0.6f);
+            }
 
             GameEvents.TriggerShotTaken(runtimeState.teamId, type, power01);
         }
@@ -256,6 +275,11 @@ namespace Football.Locomotion
             ball.Pass(targetPos, passSpeed, isLobbed, runtimeState.jerseyNumber, runtimeState.teamId);
             runtimeState.hasBall = false;
 
+            if (locomotion != null)
+            {
+                locomotion.OnBallKicked(0.5f);
+            }
+
             if (targetTeammate != null)
             {
                 GameEvents.TriggerPassInitiated(runtimeState.teamId, targetTeammate);
@@ -306,8 +330,12 @@ namespace Football.Locomotion
             var ball = FootballBall.Instance;
             if (ball == null) return;
 
+            // Already released - avoid double-punt
+            if (!runtimeState.isHoldingBallInHands && !runtimeState.hasBall) return;
+
             // Release ball from goalkeeper's hands
             runtimeState.isHoldingBallInHands = false;
+            runtimeState.hasBall = false;
 
             if (targetTeammate == null)
             {
@@ -336,6 +364,10 @@ namespace Football.Locomotion
             // Drop ball from hands down towards foot striking height (0.35m)
             ball.transform.position = transform.position + transform.forward * 0.65f + Vector3.up * 0.35f;
 
+            // CRITICAL: Immediately zero ball velocity so the physics pass starts clean
+            ball.BallRigidbody.linearVelocity = Vector3.zero;
+            ball.BallRigidbody.angularVelocity = Vector3.zero;
+
             // Trigger visual kicking animation with the foot!
             var anim = GetComponent<ProceduralRunnerAnimator>();
             if (anim != null)
@@ -349,7 +381,14 @@ namespace Football.Locomotion
 
             // Execute high lofted punt kick with foot to outfield teammate
             ball.Pass(targetPos, puntSpeed, lobbed: true, runtimeState.jerseyNumber, runtimeState.teamId);
-            runtimeState.hasBall = false;
+
+            // CRITICAL FIX: Tell the locomotion system the ball was kicked so the dribble
+            // magnet does NOT immediately re-catch the ball in the very next physics frame!
+            if (locomotion != null)
+            {
+                locomotion.OnBallKicked(1.8f); // generous cooldown prevents instant re-catch
+                locomotion.StartGoalkeeperReleaseCooldown(); // 6-second block on re-catching own punt
+            }
 
             if (targetTeammate != null)
             {
@@ -410,7 +449,7 @@ namespace Football.Locomotion
         {
             if (isSlideTackling || runtimeState.hasBall) return;
 
-            // Cannot tackle if any goalkeeper is holding ball with hands (foul)
+            // Cannot tackle if any goalkeeper is holding ball with hands (foul / illegal)
             var allPlayers = FindObjectsByType<PlayerRuntimeState>(FindObjectsSortMode.None);
             for (int i = 0; i < allPlayers.Length; i++)
             {
@@ -428,6 +467,7 @@ namespace Football.Locomotion
                 // Successfully won ball
                 Vector3 tacklePokeDir = transform.forward + Vector3.up * 0.1f;
                 ball.Kick(tacklePokeDir * standingTackleForce, Vector3.zero, runtimeState.jerseyNumber, runtimeState.teamId);
+                if (locomotion != null) locomotion.OnBallKicked(0.5f);
                 GameEvents.TriggerTackleExecuted(runtimeState.teamId, true);
             }
             else
@@ -440,7 +480,7 @@ namespace Football.Locomotion
         {
             if (isSlideTackling || runtimeState.hasBall) return;
 
-            // Cannot tackle if any goalkeeper is holding ball with hands (foul)
+            // Cannot slide tackle if any goalkeeper is holding ball with hands (foul / illegal)
             var allPlayers = FindObjectsByType<PlayerRuntimeState>(FindObjectsSortMode.None);
             for (int i = 0; i < allPlayers.Length; i++)
             {
@@ -467,6 +507,7 @@ namespace Football.Locomotion
                     {
                         Vector3 kickDir = (slideDirection + Vector3.up * 0.2f).normalized;
                         ball.Kick(kickDir * 18.0f, Vector3.zero, runtimeState.jerseyNumber, runtimeState.teamId);
+                        if (locomotion != null) locomotion.OnBallKicked(0.7f);
                     }
                 }
                 else

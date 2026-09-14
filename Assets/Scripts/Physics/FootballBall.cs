@@ -88,16 +88,20 @@ namespace Football.PhysicsEngine
                     }
                 }
 
-                // 3. Turf Rolling Resistance
+                // 3. Turf Rolling Resistance & Authentic Surface Rolling Spin
                 if (isGrounded)
                 {
                     Vector3 friction = -new Vector3(v.x, 0f, v.z).normalized * (rollingResistance * ballMass * 9.81f * Time.fixedDeltaTime);
                     rb.AddForce(friction, ForceMode.Impulse);
+
+                    // Authentic rolling angular velocity matching turf speed: omega = (v x up) / R
+                    Vector3 rollingOmega = new Vector3(v.z / ballRadius, 0f, -v.x / ballRadius);
+                    rb.angularVelocity = Vector3.Lerp(rb.angularVelocity, rollingOmega, 20.0f * Time.fixedDeltaTime);
                 }
             }
 
-            // Spin decay
-            if (rb.angularVelocity.sqrMagnitude > 0.01f)
+            // In-flight Spin Decay
+            if (!isGrounded && rb.angularVelocity.sqrMagnitude > 0.01f)
             {
                 rb.angularVelocity = Vector3.Lerp(rb.angularVelocity, Vector3.zero, spinDamping * Time.fixedDeltaTime);
             }
@@ -178,21 +182,36 @@ namespace Football.PhysicsEngine
             }
         }
 
+        private float setPieceCooldown = 0f;
+
         private void CheckPitchBoundaries()
         {
+            if (setPieceCooldown > 0f)
+            {
+                setPieceCooldown -= Time.fixedDeltaTime;
+                return;
+            }
+
+            if (GameEvents.CurrentMatchState != MatchState.InPlay)
+            {
+                return;
+            }
+
             Vector3 pos = transform.position;
 
             // Only evaluate if ball is well outside boundary and not inside goal
-            if (!PitchConstants.IsInsidePitch(pos, 0.5f))
+            if (!PitchConstants.IsInsidePitch(pos, 0.8f))
             {
                 bool isPastGoalLine = Mathf.Abs(pos.z) > PitchConstants.HalfLength;
-                bool isInsideGoalMouth = Mathf.Abs(pos.x) <= (PitchConstants.GoalWidth * 0.5f) && pos.y <= PitchConstants.GoalHeight;
+                bool isInsideGoalMouth = Mathf.Abs(pos.x) <= (PitchConstants.GoalWidth * 0.5f + 0.3f) && pos.y <= (PitchConstants.GoalHeight + 0.3f);
 
                 if (isPastGoalLine && isInsideGoalMouth)
                 {
                     // Goal will be caught by Goal trigger
                     return;
                 }
+
+                setPieceCooldown = 2.5f;
 
                 // If outside touchline (X boundaries)
                 if (Mathf.Abs(pos.x) > PitchConstants.HalfWidth)
