@@ -256,10 +256,13 @@ namespace Football.Engine
             }
             else
             {
-                // Human team kickoff: automatically switch active human control to kickoff taker
-                if (TeamPlayerSwitcher.Instance != null && kickoffTaker != null)
+                // Human team kickoff: automatically switch active human control to kickoff taker via decoupled GameEvents
+                if (kickoffTaker != null)
                 {
-                    TeamPlayerSwitcher.Instance.SwitchToPlayer(kickoffTaker);
+                    var inputHandler = kickoffTaker.GetComponent<FootballInputHandler>();
+                    if (inputHandler != null) inputHandler.isHumanControlled = true;
+
+                    GameEvents.TriggerRequestPlayerSwitch(kickoffTaker.transform);
                 }
 
                 // Wait for user order / input, or auto-start after 4.0 seconds

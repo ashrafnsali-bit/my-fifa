@@ -71,6 +71,7 @@ namespace Football.Core
         public static event Action<int, ShotType, float> OnShotTaken; // teamId, type, power
         public static event Action<int, PassType> OnPassCompleted; // teamId, passType
         public static event Action<int, Transform> OnPassInitiated; // teamId, targetTeammate
+        public static event Action<Transform> OnRequestPlayerSwitch; // targetPlayerTransform
         public static event Action<int, bool> OnTackleExecuted; // teamId, wasSuccessful
         public static event Action OnWoodworkHit;
         public static event Action OnGoalNetHit;
@@ -99,6 +100,7 @@ namespace Football.Core
         public static void TriggerShotTaken(int teamId, ShotType type, float power) => OnShotTaken?.Invoke(teamId, type, power);
         public static void TriggerPassCompleted(int teamId, PassType passType) => OnPassCompleted?.Invoke(teamId, passType);
         public static void TriggerPassInitiated(int teamId, Transform targetTeammate) => OnPassInitiated?.Invoke(teamId, targetTeammate);
+        public static void TriggerRequestPlayerSwitch(Transform target) => OnRequestPlayerSwitch?.Invoke(target);
         public static void TriggerTackleExecuted(int teamId, bool success) => OnTackleExecuted?.Invoke(teamId, success);
         public static void TriggerWoodworkHit() => OnWoodworkHit?.Invoke();
         public static void TriggerGoalNetHit() => OnGoalNetHit?.Invoke();

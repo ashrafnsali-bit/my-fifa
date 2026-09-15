@@ -41,11 +41,22 @@ public class TeamPlayerSwitcher : MonoBehaviour
     private void OnEnable()
     {
         GameEvents.OnPassInitiated += HandlePassInitiated;
+        GameEvents.OnRequestPlayerSwitch += HandleRequestPlayerSwitch;
     }
 
     private void OnDisable()
     {
         GameEvents.OnPassInitiated -= HandlePassInitiated;
+        GameEvents.OnRequestPlayerSwitch -= HandleRequestPlayerSwitch;
+    }
+
+    private void HandleRequestPlayerSwitch(Transform target)
+    {
+        if (target != null)
+        {
+            var p = target.GetComponent<PlayerRuntimeState>();
+            if (p != null) SwitchToPlayer(p);
+        }
     }
 
     private void HandlePassInitiated(int teamId, Transform targetTeammate)
