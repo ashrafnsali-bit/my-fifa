@@ -164,6 +164,24 @@ namespace Football.Tactics
             bool isHomeSide = (runtimeState.teamId == 1);
             bool insideBox = Vector3.Distance(transform.position, ownGoal) <= 24.0f;
 
+            // Guard: If ball has already crossed the goal line (inside net or out of bounds):
+            if (Mathf.Abs(ballPos.z) >= PitchConstants.HalfLength - 0.25f)
+            {
+                // Goalkeeper stands firmly in the center of the goal line, facing the pitch
+                Vector3 gkHomePos = ownGoal + (isHomeSide ? Vector3.forward : Vector3.back) * 1.8f;
+                Vector3 toHome = gkHomePos - transform.position;
+                toHome.y = 0f;
+                if (toHome.magnitude > 0.25f)
+                {
+                    locomotion.SetWorldMovementInput(toHome.normalized, false);
+                }
+                else
+                {
+                    locomotion.SetWorldMovementInput(Vector3.zero, false);
+                }
+                return;
+            }
+
             // B. Immediate clean catch or save if ball is within arms reach
             if (insideBox && distToBall <= 2.8f && ballPos.y <= 2.8f)
             {

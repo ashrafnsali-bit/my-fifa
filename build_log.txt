@@ -1,0 +1,44 @@
+[Licensing::Module] Trying to connect to existing licensing client channel...
+Built from '6000.4/staging' branch; Version is '6000.4.6f1 (0b051c2e5d54) revision 722204'; Using compiler version '194234433'; Build Type 'Release'
+[Licensing::IpcConnector] Successfully connected to: "LicenseClient-abu lara" at "2026-09-14T22:58:05.9762707Z"
+OS: 'Windows 11  (10.0.26200) Professional' Language: 'en' Physical Memory: 15774 MB
+BatchMode: 1, IsHumanControllingUs: 0, StartBugReporterOnCrash: 0, Is64bit: 1
+System  architecture: x64
+Process architecture: x64
+Date: 2026-09-14T22:58:05Z
+[Licensing::Client] Code 10 while verifying Licensing Client signature (process Id: 11824, path: "C:/Program Files/Unity Hub/UnityLicensingClient_V1/Unity.Licensing.Client.exe")
+[Licensing::Module] LicensingClient has failed validation; ignoring
+[Licensing::Client] Handshaking with LicensingClient:
+  Version:                 1.18.3+d7ffd15
+  Session Id:              26aceccf4dfa4dbdab29b1217759d281
+  Correlation Id:          1ef9dfaf83fab6893b12ea06939701af
+  External correlation Id: 7725905386928925707
+  Machine Id:              3zPbay3EsZEXlWdvzd9HGESqvIw=
+[Licensing::Module] Successfully connected to LicensingClient on channel: "LicenseClient-abu lara" (connect: 0.00s, validation: 0.01s, handshake: 0.21s)
+[Licensing::IpcConnector] Successfully connected to: "LicenseClient-abu lara-notifications" at "2026-09-14T22:58:06.19722Z"
+[Licensing::Module] Error: Access token is unavailable; failed to update
+[Licensing::Client] Successfully resolved entitlement details
+[Licensing::Module] License group:
+  Id: 18968486053442-UnityPersXXXX
+  Product: Unity Personal
+  Type: Assigned
+  Expiration: Unlimited
+[Licensing::Client] Successfully updated license, isAsync: True, time: 0.00
+[Licensing::Client] Successfully resolved entitlement details
+[Licensing::Module] Licensing Background thread has ended after 0.24s
+
+COMMAND LINE ARGUMENTS:
+C:\Program Files\Unity\Hub\Editor\6000.4.6f1\Editor\Unity.exe
+-quit
+-batchmode
+-projectPath
+c:\Users\abu lara\Documents\New folder\fifa26
+-executeMethod
+WebGLBuilder.BuildWebGLCLI
+-buildTarget
+WebGL
+-logFile
+c:\Users\abu lara\Documents\New folder\fifa26\build_log.txt
+Successfully changed project path to: c:\Users\abu lara\Documents\New folder\fifa26
+C:/Users/abu lara/Documents/New folder/fifa26
+Exiting without the bug reporter. Application will terminate with return code 1

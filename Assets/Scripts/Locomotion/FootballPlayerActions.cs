@@ -76,9 +76,17 @@ namespace Football.Locomotion
 
         #region Kicking & Shooting API
 
+        private bool CanExecuteKickAction()
+        {
+            var state = GameEvents.CurrentMatchState;
+            return state == MatchState.InPlay || state == MatchState.KickOff ||
+                   state == MatchState.FreeKick || state == MatchState.CornerKick ||
+                   state == MatchState.GoalKick || state == MatchState.PenaltyKick || state == MatchState.ThrowIn;
+        }
+
         public void StartShotCharge()
         {
-            if (GameEvents.CurrentMatchState != MatchState.InPlay) return;
+            if (!CanExecuteKickAction()) return;
 
             var ball = FootballBall.Instance;
             Vector3 toBall = ball != null ? (ball.transform.position - transform.position) : Vector3.zero;
@@ -101,7 +109,7 @@ namespace Football.Locomotion
 
         public void ExecuteShot(ShotType type, Vector3 aimDirection, float power01)
         {
-            if (GameEvents.CurrentMatchState != MatchState.InPlay) return;
+            if (!CanExecuteKickAction()) return;
 
             var ball = FootballBall.Instance;
             if (ball == null) return;
@@ -195,12 +203,22 @@ namespace Football.Locomotion
                 locomotion.OnBallKicked(0.6f);
             }
 
+            // If ball was kicked from KickOff or SetPiece, start active match play immediately!
+            if (Football.Engine.MatchEngine.Instance != null && Football.Engine.MatchEngine.Instance.currentState == MatchState.KickOff)
+            {
+                Football.Engine.MatchEngine.Instance.StartPlayFromKickoff();
+            }
+            else if (GameEvents.CurrentMatchState != MatchState.InPlay)
+            {
+                GameEvents.TriggerMatchStateChanged(MatchState.InPlay);
+            }
+
             GameEvents.TriggerShotTaken(runtimeState.teamId, type, power01);
         }
 
         public void StartPassCharge()
         {
-            if (GameEvents.CurrentMatchState != MatchState.InPlay) return;
+            if (!CanExecuteKickAction()) return;
 
             var ball = FootballBall.Instance;
             float dist = ball != null ? Vector3.Distance(transform.position, ball.transform.position) : 99f;
@@ -223,7 +241,7 @@ namespace Football.Locomotion
 
         public void ExecutePass(PassType type, Vector3 aimDirection, float power01, Transform targetTeammate = null)
         {
-            if (GameEvents.CurrentMatchState != MatchState.InPlay) return;
+            if (!CanExecuteKickAction()) return;
 
             var ball = FootballBall.Instance;
             if (ball == null) return;
@@ -286,6 +304,16 @@ namespace Football.Locomotion
             if (locomotion != null)
             {
                 locomotion.OnBallKicked(0.5f);
+            }
+
+            // If ball was kicked from KickOff or SetPiece, start active match play immediately!
+            if (Football.Engine.MatchEngine.Instance != null && Football.Engine.MatchEngine.Instance.currentState == MatchState.KickOff)
+            {
+                Football.Engine.MatchEngine.Instance.StartPlayFromKickoff();
+            }
+            else if (GameEvents.CurrentMatchState != MatchState.InPlay)
+            {
+                GameEvents.TriggerMatchStateChanged(MatchState.InPlay);
             }
 
             if (targetTeammate != null)

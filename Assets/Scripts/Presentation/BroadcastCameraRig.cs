@@ -18,25 +18,25 @@ namespace Football.Presentation
 
         [Header("Close-Action Proximity & Perspective")]
         [Tooltip("Horizontal distance from camera to the ball (lower = closer to the ball)")]
-        public float distanceToBall = 10.5f;
+        public float distanceToBall = 22.0f;
 
         [Tooltip("Elevation of the camera above the pitch")]
-        public float cameraHeight = 4.8f;
+        public float cameraHeight = 14.5f;
 
         [Tooltip("Smooth transition time for position tracking")]
         public float smoothTime = 0.05f;
 
         [Header("Dynamic Field of View")]
         [Tooltip("Base field of view (lower = tighter closer zoom)")]
-        public float baseFieldOfView = 24f;
-        public float maxFieldOfView = 29f;
-        public float speedZoomFactor = 0.12f;
+        public float baseFieldOfView = 34f;
+        public float maxFieldOfView = 40f;
+        public float speedZoomFactor = 0.14f;
 
         [Header("Interactive Zoom Controls")]
         [Tooltip("Enable mouse scrollwheel and keys (+/-, [/], 8/9/0) to zoom closer or further in real-time")]
         public bool enableInteractiveZoom = true;
-        public float minDistance = 5.0f;
-        public float maxDistance = 24.0f;
+        public float minDistance = 8.0f;
+        public float maxDistance = 38.0f;
 
         public float sidelineDistance
         {
@@ -65,9 +65,9 @@ namespace Football.Presentation
             cam = GetComponent<Camera>();
             if (cam == null) cam = Camera.main;
 
-            if (distanceToBall < 4f) distanceToBall = 10.5f;
-            if (cameraHeight < 1.5f) cameraHeight = 4.8f;
-            if (baseFieldOfView < 10f) baseFieldOfView = 24f;
+            if (distanceToBall < 5f) distanceToBall = 22.0f;
+            if (cameraHeight < 3f) cameraHeight = 14.5f;
+            if (baseFieldOfView < 15f) baseFieldOfView = 34f;
         }
 
         private void Start()
@@ -91,12 +91,14 @@ namespace Football.Presentation
             SnapToBall();
             Football.Core.GameEvents.OnWoodworkHit += HandleWoodworkShake;
             Football.Core.GameEvents.OnGoalScored += HandleGoalShake;
+            Football.Core.GameEvents.OnCameraSnapRequested += SnapToBall;
         }
 
         private void OnDisable()
         {
             Football.Core.GameEvents.OnWoodworkHit -= HandleWoodworkShake;
             Football.Core.GameEvents.OnGoalScored -= HandleGoalShake;
+            Football.Core.GameEvents.OnCameraSnapRequested -= SnapToBall;
         }
 
         private void HandleWoodworkShake()

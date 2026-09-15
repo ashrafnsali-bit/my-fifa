@@ -134,13 +134,13 @@ public class TeamPlayerSwitcher : MonoBehaviour
         }
 
         // 4. POSSESSION AUTO-SWITCH:
-        // If any outfield teammate has the ball or is in immediate dribbling contact (< 1.6m)
+        // Only switch among OUTFIELD teammates who have the ball
         for (int i = 0; i < teamPlayers.Count; i++)
         {
             var p = teamPlayers[i];
             if (p == null || p.isSentOff) continue;
-
-            // We now allow the user to switch to the Goalkeeper so they can manually choose when to kick the ball.
+            // Goalkeeper is managed exclusively by specialized goalkeeper AI
+            if (p.attributes != null && p.attributes.position == PlayerPosition.GK) continue;
 
             if (p.hasBall || Vector3.Distance(p.transform.position, ballPos) < 1.6f)
             {
@@ -155,7 +155,7 @@ public class TeamPlayerSwitcher : MonoBehaviour
         if (Time.time - lastSwitchTime < minSwitchInterval) return;
 
         // 5. DEFENDING AUTO-SWITCH:
-        // If active player is far from the ball and another teammate is significantly closer
+        // If active player is far from the ball and another outfield teammate is significantly closer
         if (currentActivePlayer != null)
         {
             float activeDist = Vector3.Distance(currentActivePlayer.transform.position, ballPos);
@@ -188,6 +188,8 @@ public class TeamPlayerSwitcher : MonoBehaviour
         {
             var p = teamPlayers[i];
             if (p == null || p.isSentOff) continue;
+            // Never switch human user to goalkeeper on shots or clearances
+            if (p.attributes != null && p.attributes.position == PlayerPosition.GK) continue;
 
             Vector3 toPlayer = p.transform.position - ballPos;
             toPlayer.y = 0;
@@ -221,6 +223,8 @@ public class TeamPlayerSwitcher : MonoBehaviour
         {
             var p = teamPlayers[i];
             if (p == null || p.isSentOff) continue;
+            // Goalkeeper is handled strictly by AI
+            if (p.attributes != null && p.attributes.position == PlayerPosition.GK) continue;
 
             float d = Vector3.Distance(p.transform.position, ballPos);
             if (d < minD)
@@ -241,6 +245,7 @@ public class TeamPlayerSwitcher : MonoBehaviour
     public void SwitchToPlayer(PlayerRuntimeState newPlayer)
     {
         if (newPlayer == null || newPlayer == currentActivePlayer) return;
+        if (newPlayer.attributes != null && newPlayer.attributes.position == PlayerPosition.GK) return;
 
         // 1. Deactivate previous active player: transfer to AI
         if (currentActivePlayer != null)

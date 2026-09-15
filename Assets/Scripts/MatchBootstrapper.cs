@@ -11,6 +11,8 @@ using Football.Engine;
 using Football.Audio;
 using Football.Presentation;
 using Football.Procedural;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -168,30 +170,49 @@ public class MatchBootstrapper : MonoBehaviour
 
     private void SetupLightingAndAtmosphere()
     {
-        var lightObj = GameObject.Find("Directional Light");
+        // 1. Primary Stadium Key Floodlight
+        var lightObj = GameObject.Find("Directional Light") ?? GameObject.Find("Stadium_KeyFloodlight");
         Light dirLight = null;
         if (lightObj != null) dirLight = lightObj.GetComponent<Light>();
         if (dirLight == null)
         {
-            var newLightObj = new GameObject("Stadium_Floodlight");
+            var newLightObj = new GameObject("Stadium_KeyFloodlight");
             dirLight = newLightObj.AddComponent<Light>();
             dirLight.type = LightType.Directional;
         }
 
-        dirLight.transform.rotation = Quaternion.Euler(78f, -10f, 0f); // Overhead stadium illumination so cast shadows land directly below
-        dirLight.intensity = 1.55f;
+        dirLight.name = "Stadium_KeyFloodlight";
+        dirLight.transform.rotation = Quaternion.Euler(70f, -22f, 0f); // High-angle stadium floodlight with soft pitch shadows
+        dirLight.intensity = 1.65f;
         dirLight.color = new Color(1.0f, 0.98f, 0.94f);
         dirLight.shadows = LightShadows.Soft;
-        dirLight.shadowStrength = 0.30f; // Soft, translucent shadows
+        dirLight.shadowStrength = 0.45f;
         dirLight.shadowBias = 0.08f;
-        dirLight.shadowNormalBias = 0.5f;
+        dirLight.shadowNormalBias = 0.02f;
 
+        // 2. Secondary Opposing Stadium Rim Light (creates crisp edge highlights on players' shoulders, hair, and kits)
+        var rimObj = GameObject.Find("Stadium_RimLight");
+        Light rimLight = null;
+        if (rimObj != null) rimLight = rimObj.GetComponent<Light>();
+        if (rimLight == null)
+        {
+            var newRimObj = new GameObject("Stadium_RimLight");
+            rimLight = newRimObj.AddComponent<Light>();
+            rimLight.type = LightType.Directional;
+        }
+
+        rimLight.transform.rotation = Quaternion.Euler(52f, 158f, 0f); // Opposing rear-high angle
+        rimLight.intensity = 0.85f;
+        rimLight.color = new Color(0.86f, 0.92f, 1.0f); // Crisp stadium cool floodlight rim
+        rimLight.shadows = LightShadows.None;
+
+        // 3. Trilight Stadium Ambient Lighting
         RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
-        RenderSettings.ambientSkyColor = new Color(0.55f, 0.60f, 0.70f);     // Bright sky fill light
-        RenderSettings.ambientEquatorColor = new Color(0.48f, 0.54f, 0.62f); // Stadium horizon fill light
-        RenderSettings.ambientGroundColor = new Color(0.32f, 0.46f, 0.32f);  // Warm grass bounce fill light
+        RenderSettings.ambientSkyColor = new Color(0.56f, 0.64f, 0.74f);     // Sky fill
+        RenderSettings.ambientEquatorColor = new Color(0.46f, 0.52f, 0.60f); // Stands horizon
+        RenderSettings.ambientGroundColor = new Color(0.25f, 0.46f, 0.25f);  // Warm grass bounce
 
-        // Global Post-Processing Volume for broadcast television glow and ACES tonemapping
+        // 4. Global Post-Processing Volume with ACES Tonemapping, Bloom, and Color Grading
         var volume = FindFirstObjectByType<UnityEngine.Rendering.Volume>();
         if (volume == null)
         {
@@ -201,13 +222,44 @@ public class MatchBootstrapper : MonoBehaviour
             volume.priority = 1.0f;
         }
 
-#if UNITY_EDITOR
-        if (volume.sharedProfile == null)
+        // Programmatic profile setup so post-processing works identically in both Editor and WebGL build!
+        if (volume.sharedProfile == null && volume.profile == null)
         {
-            var profile = UnityEditor.AssetDatabase.LoadAssetAtPath<UnityEngine.Rendering.VolumeProfile>("Assets/Settings/SampleSceneProfile.asset");
-            if (profile != null) volume.sharedProfile = profile;
+            volume.profile = ScriptableObject.CreateInstance<UnityEngine.Rendering.VolumeProfile>();
         }
-#endif
+
+        var activeProfile = volume.profile != null ? volume.profile : volume.sharedProfile;
+        if (activeProfile != null)
+        {
+            if (!activeProfile.Has<UnityEngine.Rendering.Universal.Tonemapping>())
+            {
+                var tonemap = activeProfile.Add<UnityEngine.Rendering.Universal.Tonemapping>(true);
+                tonemap.mode.Override(UnityEngine.Rendering.Universal.TonemappingMode.ACES);
+            }
+
+            if (!activeProfile.Has<UnityEngine.Rendering.Universal.Bloom>())
+            {
+                var bloom = activeProfile.Add<UnityEngine.Rendering.Universal.Bloom>(true);
+                bloom.threshold.Override(0.90f);
+                bloom.intensity.Override(0.50f);
+                bloom.scatter.Override(0.70f);
+            }
+
+            if (!activeProfile.Has<UnityEngine.Rendering.Universal.ColorAdjustments>())
+            {
+                var colorAdj = activeProfile.Add<UnityEngine.Rendering.Universal.ColorAdjustments>(true);
+                colorAdj.postExposure.Override(0.12f);
+                colorAdj.contrast.Override(14f);
+                colorAdj.saturation.Override(16f);
+            }
+
+            if (!activeProfile.Has<UnityEngine.Rendering.Universal.Vignette>())
+            {
+                var vignette = activeProfile.Add<UnityEngine.Rendering.Universal.Vignette>(true);
+                vignette.intensity.Override(0.20f);
+                vignette.smoothness.Override(0.30f);
+            }
+        }
     }
 
     private void BuildFullStadiumPitch()
@@ -289,11 +341,11 @@ public class MatchBootstrapper : MonoBehaviour
 
         // Iconic Sideline Broadcast Perspective (locks ball in screen center, strictly horizontal touchlines)
         rig.lockBallInCenter = true;
-        rig.distanceToBall = 10.5f;
-        rig.sidelineDistance = 10.5f;
-        rig.cameraHeight = 4.8f;
-        rig.baseFieldOfView = 24f;
-        rig.maxFieldOfView = 29f;
+        rig.distanceToBall = 22.0f;
+        rig.sidelineDistance = 22.0f;
+        rig.cameraHeight = 14.5f;
+        rig.baseFieldOfView = 34f;
+        rig.maxFieldOfView = 40f;
         rig.smoothTime = 0.05f;
         rig.SnapToBall();
     }
@@ -332,11 +384,6 @@ public class MatchBootstrapper : MonoBehaviour
         Material gkShortsMat = CreateLitMaterial(gkColor, 0.22f, fabricNormal);
         Material gkSocksMat = CreateLitMaterial(gkColor, 0.20f, fabricNormal);
 
-        // Anatomy & Equipment materials
-        Material skinMat = CreateLitMaterial(new Color(0.86f, 0.70f, 0.58f), 0.32f);
-        Material bootsMat = CreateLitMaterial(new Color(0.12f, 0.12f, 0.14f), 0.75f, null, 0.40f);
-        Material hairMat = CreateLitMaterial(new Color(0.14f, 0.10f, 0.08f), 0.15f);
-
         PlayerRuntimeState defaultHumanPlayer = null;
 
         for (int i = 0; i < slots.Length; i++)
@@ -344,7 +391,7 @@ public class MatchBootstrapper : MonoBehaviour
             var slot = slots[i];
             bool isGK = slot.position == PlayerPosition.GK;
             Vector3 worldPos = FormationData.GetWorldPosition(slot, teamId);
-            worldPos.y = 1.0f;
+            worldPos.y = 0.0f; // Firmly grounded on pitch surface
 
             GameObject playerObj = new GameObject($"Player_{teamId}_{slot.roleName}");
             playerObj.transform.SetParent(teamRoot.transform, false);
@@ -362,7 +409,8 @@ public class MatchBootstrapper : MonoBehaviour
 
             var rb = playerObj.AddComponent<Rigidbody>();
             rb.mass = 75f;
-            rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
+            rb.useGravity = false; // Prevents sinking/floating, ground physics is locked to pitch Y
+            rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ | RigidbodyConstraints.FreezePositionY;
 
             // Star rosters
             string[] argNames = { "E. Martinez", "M. Acuna", "N. Otamendi", "C. Romero", "N. Molina", "E. Fernandez", "A. Mac Allister", "R. De Paul", "A. Di Maria", "L. Messi", "J. Alvarez" };
@@ -389,12 +437,13 @@ public class MatchBootstrapper : MonoBehaviour
             var locomotion = playerObj.AddComponent<FootballPlayerLocomotion>();
             var actions = playerObj.AddComponent<FootballPlayerActions>();
 
-            // 4. Athletic 3D Visual Mesh with limbs, shorts, socks, squad number and styled hair
+            // 4. Athletic 3D Visual Mesh with anatomical proportions, star hairstyle, boots, soleplate & studs
             Material jersey = isGK ? gkJerseyMat : outfieldJerseyMat;
             Material shorts = isGK ? gkShortsMat : outfieldShortsMat;
             Material socks = isGK ? gkSocksMat : outfieldSocksMat;
 
-            BuildPlayerVisuals(playerObj.transform, jersey, shorts, socks, skinMat, bootsMat, hairMat, isGK, jerseyNum, teamId);
+            var profile = GetPlayerVisualProfile(teamId, jerseyNum, playerName);
+            BuildPlayerVisuals(playerObj.transform, jersey, shorts, socks, profile, isGK, jerseyNum, teamId);
 
             playerList.Add(locomotion);
 
@@ -438,6 +487,264 @@ public class MatchBootstrapper : MonoBehaviour
         return playerList;
     }
 
+    public enum HairStyle
+    {
+        ShortBuzz,
+        TexturedFade,
+        Pompadour,
+        BlondeCrop,
+        SlickedBack,
+        ClassicSidePart,
+        CurlyAfroFade
+    }
+
+    public struct PlayerVisualProfile
+    {
+        public string playerName;
+        public Color skinColor;
+        public Color hairColor;
+        public HairStyle hairStyle;
+        public bool hasBeard;
+        public Color beardColor;
+        public bool isCaptain;
+        public bool hasWristTape;
+        public Color bootBaseColor;
+        public Color bootAccentColor;
+        public Color bootStudColor;
+        public float bodyHeight;
+        public float shoulderWidth;
+    }
+
+    private PlayerVisualProfile GetPlayerVisualProfile(int teamId, int jerseyNum, string playerName)
+    {
+        var profile = new PlayerVisualProfile
+        {
+            playerName = playerName,
+            skinColor = new Color(0.88f, 0.72f, 0.58f),
+            hairColor = new Color(0.12f, 0.09f, 0.07f),
+            hairStyle = HairStyle.TexturedFade,
+            hasBeard = false,
+            beardColor = new Color(0.12f, 0.09f, 0.07f),
+            isCaptain = false,
+            hasWristTape = false,
+            bootBaseColor = new Color(0.12f, 0.12f, 0.14f),
+            bootAccentColor = new Color(0.95f, 0.25f, 0.25f),
+            bootStudColor = new Color(0.90f, 0.90f, 0.95f),
+            bodyHeight = 1.0f,
+            shoulderWidth = 1.0f
+        };
+
+        if (teamId == 1) // Argentina
+        {
+            switch (jerseyNum)
+            {
+                case 10: // Lionel Messi (Captain, GOAT)
+                    profile.skinColor = new Color(0.92f, 0.76f, 0.63f);
+                    profile.hairColor = new Color(0.20f, 0.14f, 0.10f);
+                    profile.hairStyle = HairStyle.TexturedFade;
+                    profile.hasBeard = true;
+                    profile.beardColor = new Color(0.28f, 0.18f, 0.12f);
+                    profile.isCaptain = true;
+                    profile.hasWristTape = true;
+                    profile.bootBaseColor = new Color(0.96f, 0.82f, 0.22f); // Adidas X Speedportal Gold
+                    profile.bootAccentColor = new Color(0.20f, 0.75f, 0.95f); // Sky blue trim
+                    profile.bootStudColor = new Color(1.0f, 0.85f, 0.20f);
+                    profile.bodyHeight = 0.97f;
+                    profile.shoulderWidth = 0.98f;
+                    break;
+
+                case 7: // Rodrigo De Paul (Midfield Engine)
+                    profile.skinColor = new Color(0.90f, 0.74f, 0.61f);
+                    profile.hairColor = new Color(0.94f, 0.90f, 0.78f); // Bleached platinum blonde
+                    profile.hairStyle = HairStyle.BlondeCrop;
+                    profile.hasBeard = true;
+                    profile.beardColor = new Color(0.18f, 0.13f, 0.10f);
+                    profile.hasWristTape = true;
+                    profile.bootBaseColor = new Color(0.95f, 0.15f, 0.15f); // Crimson red boots
+                    profile.bootAccentColor = Color.white;
+                    profile.bodyHeight = 1.01f;
+                    profile.shoulderWidth = 1.04f;
+                    break;
+
+                case 23: // Emiliano Martinez (Dibu - GK)
+                    profile.skinColor = new Color(0.91f, 0.75f, 0.62f);
+                    profile.hairColor = new Color(0.16f, 0.11f, 0.08f);
+                    profile.hairStyle = HairStyle.ShortBuzz;
+                    profile.hasBeard = false;
+                    profile.bootBaseColor = new Color(0.15f, 0.85f, 0.25f); // Volt green
+                    profile.bootAccentColor = Color.black;
+                    profile.bodyHeight = 1.06f; // Tall keeper
+                    profile.shoulderWidth = 1.08f;
+                    break;
+
+                case 11: // Angel Di Maria
+                    profile.skinColor = new Color(0.89f, 0.73f, 0.60f);
+                    profile.hairColor = new Color(0.10f, 0.08f, 0.06f);
+                    profile.hairStyle = HairStyle.SlickedBack;
+                    profile.hasBeard = false;
+                    profile.bootBaseColor = new Color(0.98f, 0.40f, 0.10f); // Blaze orange
+                    profile.bootAccentColor = Color.white;
+                    profile.bodyHeight = 1.02f;
+                    profile.shoulderWidth = 0.94f;
+                    break;
+
+                case 9: // Julian Alvarez
+                    profile.skinColor = new Color(0.91f, 0.75f, 0.62f);
+                    profile.hairColor = new Color(0.12f, 0.08f, 0.06f);
+                    profile.hairStyle = HairStyle.TexturedFade;
+                    profile.hasBeard = false;
+                    profile.bootBaseColor = new Color(0.20f, 0.80f, 0.95f);
+                    profile.bootAccentColor = Color.white;
+                    profile.bodyHeight = 0.99f;
+                    break;
+
+                case 19: // Nicolas Otamendi
+                    profile.skinColor = new Color(0.87f, 0.70f, 0.57f);
+                    profile.hairColor = new Color(0.12f, 0.08f, 0.06f);
+                    profile.hairStyle = HairStyle.ClassicSidePart;
+                    profile.hasBeard = true;
+                    profile.beardColor = new Color(0.14f, 0.10f, 0.07f);
+                    profile.bootBaseColor = new Color(0.15f, 0.15f, 0.18f);
+                    profile.bootAccentColor = new Color(0.9f, 0.7f, 0.2f);
+                    profile.bodyHeight = 1.02f;
+                    profile.shoulderWidth = 1.06f;
+                    break;
+
+                case 13: // Cristian Romero
+                    profile.skinColor = new Color(0.88f, 0.71f, 0.58f);
+                    profile.hairColor = new Color(0.10f, 0.07f, 0.05f);
+                    profile.hairStyle = HairStyle.TexturedFade;
+                    profile.hasBeard = false;
+                    profile.bootBaseColor = new Color(0.85f, 0.15f, 0.25f);
+                    profile.bootAccentColor = Color.white;
+                    profile.bodyHeight = 1.03f;
+                    profile.shoulderWidth = 1.05f;
+                    break;
+
+                default:
+                    profile.bootBaseColor = new Color(0.15f, 0.15f, 0.18f);
+                    profile.bootAccentColor = new Color(0.2f, 0.75f, 0.95f);
+                    break;
+            }
+        }
+        else // France
+        {
+            switch (jerseyNum)
+            {
+                case 10: // Kylian Mbappe (Captain / Speed Phenomenon)
+                    profile.skinColor = new Color(0.44f, 0.30f, 0.20f); // Deep rich complexion
+                    profile.hairColor = new Color(0.05f, 0.05f, 0.05f);
+                    profile.hairStyle = HairStyle.ShortBuzz;
+                    profile.hasBeard = false;
+                    profile.hasWristTape = true;
+                    profile.bootBaseColor = new Color(0.92f, 0.12f, 0.52f); // Nike Mercurial Hot Pink
+                    profile.bootAccentColor = new Color(0.10f, 0.85f, 0.75f);
+                    profile.bootStudColor = new Color(0.95f, 0.15f, 0.55f);
+                    profile.bodyHeight = 1.00f;
+                    profile.shoulderWidth = 1.04f;
+                    break;
+
+                case 1: // Hugo Lloris (Captain & Veteran GK)
+                    profile.skinColor = new Color(0.91f, 0.75f, 0.62f);
+                    profile.hairColor = new Color(0.14f, 0.10f, 0.07f);
+                    profile.hairStyle = HairStyle.ClassicSidePart;
+                    profile.hasBeard = true;
+                    profile.beardColor = new Color(0.18f, 0.14f, 0.10f);
+                    profile.isCaptain = true;
+                    profile.bootBaseColor = new Color(0.95f, 0.95f, 0.98f);
+                    profile.bootAccentColor = new Color(0.1f, 0.3f, 0.8f);
+                    profile.bodyHeight = 1.04f;
+                    profile.shoulderWidth = 1.04f;
+                    break;
+
+                case 9: // Olivier Giroud (Target Man)
+                    profile.skinColor = new Color(0.92f, 0.76f, 0.63f);
+                    profile.hairColor = new Color(0.18f, 0.13f, 0.09f);
+                    profile.hairStyle = HairStyle.Pompadour;
+                    profile.hasBeard = true;
+                    profile.beardColor = new Color(0.20f, 0.15f, 0.11f);
+                    profile.bootBaseColor = new Color(0.15f, 0.15f, 0.20f);
+                    profile.bootAccentColor = new Color(0.95f, 0.25f, 0.20f);
+                    profile.bodyHeight = 1.06f; // Tall striker
+                    profile.shoulderWidth = 1.08f;
+                    break;
+
+                case 7: // Antoine Griezmann
+                    profile.skinColor = new Color(0.93f, 0.78f, 0.65f);
+                    profile.hairColor = new Color(0.95f, 0.85f, 0.60f); // Bright blonde
+                    profile.hairStyle = HairStyle.BlondeCrop;
+                    profile.hasBeard = false;
+                    profile.bootBaseColor = new Color(0.95f, 0.85f, 0.10f); // Neon yellow
+                    profile.bootAccentColor = new Color(0.95f, 0.20f, 0.45f);
+                    profile.bodyHeight = 0.98f;
+                    profile.shoulderWidth = 0.98f;
+                    break;
+
+                case 4: // Raphael Varane
+                    profile.skinColor = new Color(0.55f, 0.40f, 0.28f);
+                    profile.hairColor = new Color(0.08f, 0.08f, 0.08f);
+                    profile.hairStyle = HairStyle.ShortBuzz;
+                    profile.hasBeard = false;
+                    profile.bootBaseColor = new Color(0.15f, 0.15f, 0.18f);
+                    profile.bootAccentColor = new Color(0.2f, 0.8f, 0.3f);
+                    profile.bodyHeight = 1.05f;
+                    profile.shoulderWidth = 1.05f;
+                    break;
+
+                case 8: // Aurelien Tchouameni
+                    profile.skinColor = new Color(0.38f, 0.25f, 0.16f);
+                    profile.hairColor = new Color(0.05f, 0.05f, 0.05f);
+                    profile.hairStyle = HairStyle.ShortBuzz;
+                    profile.hasBeard = false;
+                    profile.bootBaseColor = new Color(0.10f, 0.50f, 0.95f);
+                    profile.bootAccentColor = Color.white;
+                    profile.bodyHeight = 1.03f;
+                    profile.shoulderWidth = 1.06f;
+                    break;
+
+                case 18: // Dayot Upamecano
+                    profile.skinColor = new Color(0.32f, 0.20f, 0.14f);
+                    profile.hairColor = new Color(0.05f, 0.05f, 0.05f);
+                    profile.hairStyle = HairStyle.CurlyAfroFade;
+                    profile.hasBeard = false;
+                    profile.bootBaseColor = new Color(0.92f, 0.15f, 0.20f);
+                    profile.bootAccentColor = Color.white;
+                    profile.bodyHeight = 1.04f;
+                    profile.shoulderWidth = 1.08f;
+                    break;
+
+                case 11: // Ousmane Dembele
+                    profile.skinColor = new Color(0.36f, 0.24f, 0.16f);
+                    profile.hairColor = new Color(0.05f, 0.05f, 0.05f);
+                    profile.hairStyle = HairStyle.ShortBuzz;
+                    profile.hasBeard = false;
+                    profile.bootBaseColor = new Color(0.15f, 0.85f, 0.30f); // Neon green
+                    profile.bootAccentColor = Color.black;
+                    profile.bodyHeight = 1.00f;
+                    profile.shoulderWidth = 0.96f;
+                    break;
+
+                case 22: // Theo Hernandez
+                    profile.skinColor = new Color(0.90f, 0.74f, 0.61f);
+                    profile.hairColor = new Color(0.15f, 0.10f, 0.08f);
+                    profile.hairStyle = HairStyle.TexturedFade;
+                    profile.hasBeard = false;
+                    profile.bootBaseColor = new Color(0.95f, 0.45f, 0.10f);
+                    profile.bootAccentColor = Color.black;
+                    profile.bodyHeight = 1.02f;
+                    profile.shoulderWidth = 1.04f;
+                    break;
+
+                default:
+                    profile.bootBaseColor = new Color(0.15f, 0.15f, 0.18f);
+                    profile.bootAccentColor = new Color(0.9f, 0.2f, 0.2f);
+                    break;
+            }
+        }
+
+        return profile;
+    }
+
     private struct PlayerLegJoints
     {
         public Transform hip;
@@ -445,16 +752,103 @@ public class MatchBootstrapper : MonoBehaviour
         public Transform ankle;
     }
 
-    private void BuildPlayerVisuals(Transform parent, Material kitMat, Material shortsMat, Material socksMat, Material skinMat, Material bootsMat, Material hairMat, bool isGK, int jerseyNum = 0, int teamId = 1)
+    private void BuildPlayerVisuals(Transform parent, Material kitMat, Material shortsMat, Material socksMat, PlayerVisualProfile profile, bool isGK, int jerseyNum = 0, int teamId = 1)
     {
-        // 1. Torso / Jersey
+        // 1. Materials for individual profile
+        Material skinMat = CreateLitMaterial(profile.skinColor, 0.35f);
+
+        Material hairMat = CreateLitMaterial(profile.hairColor, 0.20f);
+        Texture2D hairFadeTex = ProceduralTextureFactory.CreateHairFadeTexture(profile.hairColor);
+        if (hairMat.HasProperty("_BaseMap")) hairMat.SetTexture("_BaseMap", hairFadeTex);
+        else if (hairMat.HasProperty("_MainTex")) hairMat.SetTexture("_MainTex", hairFadeTex);
+
+        Material bootsMat = CreateLitMaterial(profile.bootBaseColor, 0.70f, null, 0.35f);
+        Texture2D bootTex = ProceduralTextureFactory.CreateBootTexture(profile.bootBaseColor, profile.bootAccentColor);
+        if (bootsMat.HasProperty("_BaseMap")) bootsMat.SetTexture("_BaseMap", bootTex);
+        else if (bootsMat.HasProperty("_MainTex")) bootsMat.SetTexture("_MainTex", bootTex);
+
+        Material soleplateMat = CreateLitMaterial(new Color(0.85f, 0.85f, 0.90f), 0.90f, null, 0.85f);
+        Texture2D soleplateTex = ProceduralTextureFactory.CreateBootSoleplateTexture(new Color(0.85f, 0.85f, 0.90f), profile.bootStudColor);
+        if (soleplateMat.HasProperty("_BaseMap")) soleplateMat.SetTexture("_BaseMap", soleplateTex);
+        else if (soleplateMat.HasProperty("_MainTex")) soleplateMat.SetTexture("_MainTex", soleplateTex);
+
+        Material studMat = CreateLitMaterial(profile.bootStudColor, 0.80f, null, 0.50f);
+
+        Material armbandMat = null;
+        if (profile.isCaptain)
+        {
+            armbandMat = CreateLitMaterial(new Color(0.98f, 0.82f, 0.12f), 0.40f);
+            Texture2D armbandTex = ProceduralTextureFactory.CreateCaptainArmbandTexture();
+            if (armbandMat.HasProperty("_BaseMap")) armbandMat.SetTexture("_BaseMap", armbandTex);
+            else if (armbandMat.HasProperty("_MainTex")) armbandMat.SetTexture("_MainTex", armbandTex);
+        }
+
+        Material wristTapeMat = null;
+        if (profile.hasWristTape)
+        {
+            wristTapeMat = CreateLitMaterial(new Color(0.96f, 0.96f, 0.98f), 0.15f);
+        }
+
+        Material gloveMat = null;
+        if (isGK)
+        {
+            gloveMat = CreateLitMaterial(Color.white, 0.30f);
+            Color backCol = (teamId == 1) ? new Color(0.15f, 0.85f, 0.35f) : new Color(0.95f, 0.85f, 0.15f);
+            Texture2D gloveTex = ProceduralTextureFactory.CreateGoalkeeperGloveTexture(backCol, new Color(0.95f, 0.95f, 0.95f));
+            if (gloveMat.HasProperty("_BaseMap")) gloveMat.SetTexture("_BaseMap", gloveTex);
+            else if (gloveMat.HasProperty("_MainTex")) gloveMat.SetTexture("_MainTex", gloveTex);
+        }
+
+        float hScale = profile.bodyHeight;
+        float wScale = profile.shoulderWidth;
+
+        // 2. Pelvis Root (Anatomical Root Joint at waist level)
+        GameObject pelvisRoot = new GameObject("Pelvis");
+        pelvisRoot.transform.SetParent(parent, false);
+        pelvisRoot.transform.localPosition = new Vector3(0f, 0.84f * hScale, 0f);
+
+        // Shorts waistband (visual mesh on pelvis)
+        GameObject hips = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        hips.name = "Shorts";
+        hips.transform.SetParent(pelvisRoot.transform, false);
+        hips.transform.localPosition = Vector3.zero;
+        hips.transform.localScale = new Vector3(0.48f * wScale, 0.16f * hScale, 0.36f);
+        DestroyImmediate(hips.GetComponent<Collider>());
+        hips.GetComponent<MeshRenderer>().sharedMaterial = shortsMat;
+
+        // 3. Torso Joint (Spine & Chest Joint - pivots and articulates upper body)
+        GameObject torsoJoint = new GameObject("TorsoJoint");
+        torsoJoint.transform.SetParent(pelvisRoot.transform, false);
+        torsoJoint.transform.localPosition = new Vector3(0f, 0.08f * hScale, 0f);
+
+        // Upper Chest Jersey Visual Mesh
         GameObject torso = GameObject.CreatePrimitive(PrimitiveType.Capsule);
         torso.name = "Torso";
-        torso.transform.SetParent(parent, false);
-        torso.transform.localPosition = new Vector3(0f, 1.05f, 0f);
-        torso.transform.localScale = new Vector3(0.56f, 0.48f, 0.38f);
+        torso.transform.SetParent(torsoJoint.transform, false);
+        torso.transform.localPosition = new Vector3(0f, 0.20f * hScale, 0f);
+        torso.transform.localScale = new Vector3(0.52f * wScale, 0.40f * hScale, 0.35f);
         DestroyImmediate(torso.GetComponent<Collider>());
         torso.GetComponent<MeshRenderer>().sharedMaterial = kitMat;
+
+        // Ribbed Collar trim
+        GameObject collar = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        collar.name = "CollarTrim";
+        collar.transform.SetParent(torsoJoint.transform, false);
+        collar.transform.localPosition = new Vector3(0f, 0.38f * hScale, 0f);
+        collar.transform.localScale = new Vector3(0.32f, 0.04f, 0.32f);
+        DestroyImmediate(collar.GetComponent<Collider>());
+        Color collarCol = (teamId == 1) ? Color.white : new Color(0.85f, 0.15f, 0.20f);
+        Material collarMat = CreateLitMaterial(collarCol, 0.25f);
+        collar.GetComponent<MeshRenderer>().sharedMaterial = collarMat;
+
+        // Anatomical Muscular Neck
+        GameObject neck = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+        neck.name = "Neck";
+        neck.transform.SetParent(torsoJoint.transform, false);
+        neck.transform.localPosition = new Vector3(0f, 0.42f * hScale, 0f);
+        neck.transform.localScale = new Vector3(0.22f, 0.12f, 0.22f);
+        DestroyImmediate(neck.GetComponent<Collider>());
+        neck.GetComponent<MeshRenderer>().sharedMaterial = skinMat;
 
         // Squad number on back of jersey
         if (jerseyNum > 0)
@@ -486,42 +880,81 @@ public class MatchBootstrapper : MonoBehaviour
             numObj.GetComponent<MeshRenderer>().sharedMaterial = numMat;
         }
 
-        // 2. Shorts / Hips
-        GameObject hips = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-        hips.name = "Shorts";
-        hips.transform.SetParent(parent, false);
-        hips.transform.localPosition = new Vector3(0f, 0.82f, 0f);
-        hips.transform.localScale = new Vector3(0.48f, 0.18f, 0.38f);
-        DestroyImmediate(hips.GetComponent<Collider>());
-        hips.GetComponent<MeshRenderer>().sharedMaterial = shortsMat;
+        // 4. Head Joint (Child of TorsoJoint: permanently attached to neck and torso)
+        GameObject headJoint = new GameObject("HeadJoint");
+        headJoint.transform.SetParent(torsoJoint.transform, false);
+        headJoint.transform.localPosition = new Vector3(0f, 0.48f * hScale, 0f);
 
-        // 3. Head
         GameObject head = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         head.name = "Head";
-        head.transform.SetParent(parent, false);
-        head.transform.localPosition = new Vector3(0f, 1.62f, 0f);
-        head.transform.localScale = new Vector3(0.32f, 0.35f, 0.32f);
+        head.transform.SetParent(headJoint.transform, false);
+        head.transform.localPosition = new Vector3(0f, 0.12f * hScale, 0f);
+        head.transform.localScale = new Vector3(0.28f, 0.30f, 0.28f);
         DestroyImmediate(head.GetComponent<Collider>());
         head.GetComponent<MeshRenderer>().sharedMaterial = skinMat;
 
-        // Hair styling cap
+        // Hair styling tailored to player profile
         GameObject hair = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         hair.name = "Hair";
         hair.transform.SetParent(head.transform, false);
-        hair.transform.localPosition = new Vector3(0f, 0.14f, -0.04f);
-        hair.transform.localScale = new Vector3(1.04f, 0.82f, 1.05f);
         DestroyImmediate(hair.GetComponent<Collider>());
         hair.GetComponent<MeshRenderer>().sharedMaterial = hairMat;
 
-        // 4. Left & Right Arms (Pivoting at shoulders for natural athletic swing)
-        Transform armL = CreateArm(parent, "Arm_L", new Vector3(-0.32f, 1.25f, 0f), kitMat, skinMat, isGK);
-        Transform armR = CreateArm(parent, "Arm_R", new Vector3(0.32f, 1.25f, 0f), kitMat, skinMat, isGK);
+        switch (profile.hairStyle)
+        {
+            case HairStyle.Pompadour: // Giroud
+                hair.transform.localPosition = new Vector3(0f, 0.16f, 0.02f);
+                hair.transform.localScale = new Vector3(1.05f, 0.92f, 1.10f);
+                break;
+            case HairStyle.BlondeCrop: // De Paul, Griezmann
+                hair.transform.localPosition = new Vector3(0f, 0.14f, -0.02f);
+                hair.transform.localScale = new Vector3(1.04f, 0.82f, 1.05f);
+                break;
+            case HairStyle.ShortBuzz: // Mbappe, Tchouameni
+                hair.transform.localPosition = new Vector3(0f, 0.10f, -0.02f);
+                hair.transform.localScale = new Vector3(1.02f, 0.74f, 1.03f);
+                break;
+            case HairStyle.CurlyAfroFade: // Upamecano
+                hair.transform.localPosition = new Vector3(0f, 0.15f, -0.01f);
+                hair.transform.localScale = new Vector3(1.06f, 0.90f, 1.06f);
+                break;
+            default: // TexturedFade (Messi, Alvarez, etc.)
+                hair.transform.localPosition = new Vector3(0f, 0.13f, -0.03f);
+                hair.transform.localScale = new Vector3(1.04f, 0.80f, 1.05f);
+                break;
+        }
 
-        // 5. Left & Right Legs with Knee Pivot Joints (for fluid human running locomotion)
-        PlayerLegJoints legL = CreateLegHierarchy(parent, "Leg_L", new Vector3(-0.16f, 0.78f, 0f), shortsMat, socksMat, bootsMat);
-        PlayerLegJoints legR = CreateLegHierarchy(parent, "Leg_R", new Vector3(0.16f, 0.78f, 0f), shortsMat, socksMat, bootsMat);
+        // Facial Beard (Messi, Giroud, De Paul, Otamendi, Lloris)
+        if (profile.hasBeard)
+        {
+            GameObject beard = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            beard.name = "Beard";
+            beard.transform.SetParent(head.transform, false);
+            beard.transform.localPosition = new Vector3(0f, -0.14f, 0.08f);
+            beard.transform.localScale = new Vector3(0.96f, 0.52f, 0.94f);
+            DestroyImmediate(beard.GetComponent<Collider>());
 
-        // 6. Procedural Runner Animator with full anatomical coordination
+            Material beardMat = CreateLitMaterial(profile.beardColor, 0.20f);
+            Texture2D beardTex = ProceduralTextureFactory.CreateBeardTexture(profile.beardColor);
+            if (beardMat.HasProperty("_BaseMap")) beardMat.SetTexture("_BaseMap", beardTex);
+            else if (beardMat.HasProperty("_MainTex")) beardMat.SetTexture("_MainTex", beardTex);
+
+            beard.GetComponent<MeshRenderer>().sharedMaterial = beardMat;
+        }
+
+        // 5. Left & Right Arms (Attached to TorsoJoint shoulders: move in sync with torso)
+        float shoulderOffsetX = 0.28f * wScale;
+        float shoulderOffsetY = 0.30f * hScale;
+        Transform armL = CreateArm(torsoJoint.transform, "Arm_L", new Vector3(-shoulderOffsetX, shoulderOffsetY, 0f), kitMat, skinMat, isGK, profile.isCaptain, armbandMat, profile.hasWristTape, wristTapeMat, gloveMat);
+        Transform armR = CreateArm(torsoJoint.transform, "Arm_R", new Vector3(shoulderOffsetX, shoulderOffsetY, 0f), kitMat, skinMat, isGK, false, null, profile.hasWristTape, wristTapeMat, gloveMat);
+
+        // 6. Left & Right Legs with Knee & Ankle Pivot Joints (Attached to Pelvis)
+        float hipOffsetX = 0.16f * wScale;
+        float hipOffsetY = -0.04f * hScale;
+        PlayerLegJoints legL = CreateLegHierarchy(pelvisRoot.transform, "Leg_L", new Vector3(-hipOffsetX, hipOffsetY, 0f), shortsMat, socksMat, bootsMat, soleplateMat, studMat);
+        PlayerLegJoints legR = CreateLegHierarchy(pelvisRoot.transform, "Leg_R", new Vector3(hipOffsetX, hipOffsetY, 0f), shortsMat, socksMat, bootsMat, soleplateMat, studMat);
+
+        // 7. Procedural Runner Animator with full anatomical coordination
         var animator = parent.gameObject.AddComponent<ProceduralRunnerAnimator>();
         animator.leftLeg = legL.hip;
         animator.rightLeg = legR.hip;
@@ -531,14 +964,14 @@ public class MatchBootstrapper : MonoBehaviour
         animator.rightAnkle = legR.ankle;
         animator.leftArm = armL;
         animator.rightArm = armR;
-        animator.torso = torso.transform;
-        animator.head = head.transform;
+        animator.torso = torsoJoint.transform;
+        animator.head = headJoint.transform;
 
-        // 7. Grounded Blob Shadow directly under feet (strictly matching player X and Z with 0 offset)
+        // 8. Grounded Blob Shadow directly under feet
         GameObject shadowObj = GameObject.CreatePrimitive(PrimitiveType.Quad);
         shadowObj.name = "PlayerBlobShadow";
         shadowObj.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
-        shadowObj.transform.localScale = new Vector3(1.35f, 1.35f, 1.0f);
+        shadowObj.transform.localScale = new Vector3(1.35f * wScale, 1.35f * wScale, 1.0f);
         shadowObj.transform.position = new Vector3(parent.position.x, 0.015f, parent.position.z);
         DestroyImmediate(shadowObj.GetComponent<Collider>());
 
@@ -557,7 +990,7 @@ public class MatchBootstrapper : MonoBehaviour
         }
     }
 
-    private Transform CreateArm(Transform parent, string name, Vector3 shoulderPos, Material sleeveMat, Material skinMat, bool isGK)
+    private Transform CreateArm(Transform parent, string name, Vector3 shoulderPos, Material sleeveMat, Material skinMat, bool isGK, bool isCaptain, Material armbandMat, bool hasWristTape, Material wristTapeMat, Material gloveMat)
     {
         GameObject armRoot = new GameObject(name);
         armRoot.transform.SetParent(parent, false);
@@ -572,6 +1005,18 @@ public class MatchBootstrapper : MonoBehaviour
         DestroyImmediate(upperArm.GetComponent<Collider>());
         upperArm.GetComponent<MeshRenderer>().sharedMaterial = sleeveMat;
 
+        // Official Captain Armband (if captain and left arm)
+        if (isCaptain && name.Contains("Arm_L") && armbandMat != null)
+        {
+            GameObject armband = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            armband.name = "CaptainArmband";
+            armband.transform.SetParent(upperArm.transform, false);
+            armband.transform.localPosition = new Vector3(0f, -0.10f, 0f);
+            armband.transform.localScale = new Vector3(1.10f, 0.42f, 1.10f);
+            DestroyImmediate(armband.GetComponent<Collider>());
+            armband.GetComponent<MeshRenderer>().sharedMaterial = armbandMat;
+        }
+
         // Forearm (skin) angled slightly forward in runner posture
         GameObject forearm = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         forearm.name = "Forearm";
@@ -582,19 +1027,31 @@ public class MatchBootstrapper : MonoBehaviour
         DestroyImmediate(forearm.GetComponent<Collider>());
         forearm.GetComponent<MeshRenderer>().sharedMaterial = skinMat;
 
+        // Athletic Wrist Tape
+        if (hasWristTape && wristTapeMat != null)
+        {
+            GameObject wristTape = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            wristTape.name = "WristTape";
+            wristTape.transform.SetParent(forearm.transform, false);
+            wristTape.transform.localPosition = new Vector3(0f, -0.85f, 0f);
+            wristTape.transform.localScale = new Vector3(1.12f, 0.20f, 1.12f);
+            DestroyImmediate(wristTape.GetComponent<Collider>());
+            wristTape.GetComponent<MeshRenderer>().sharedMaterial = wristTapeMat;
+        }
+
         // Hand / Glove
         GameObject hand = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        hand.name = "Hand";
+        hand.name = isGK ? "GoalkeeperGlove" : "Hand";
         hand.transform.SetParent(forearm.transform, false);
-        hand.transform.localPosition = new Vector3(0f, -1.0f, 0f);
-        hand.transform.localScale = new Vector3(1.1f, 1.2f, 0.8f);
+        hand.transform.localPosition = new Vector3(0f, -1.05f, 0f);
+        hand.transform.localScale = isGK ? new Vector3(1.35f, 1.45f, 1.1f) : new Vector3(1.1f, 1.2f, 0.8f);
         DestroyImmediate(hand.GetComponent<Collider>());
-        hand.GetComponent<MeshRenderer>().sharedMaterial = isGK ? sleeveMat : skinMat;
+        hand.GetComponent<MeshRenderer>().sharedMaterial = isGK ? (gloveMat ?? sleeveMat) : skinMat;
 
         return armRoot.transform;
     }
 
-    private PlayerLegJoints CreateLegHierarchy(Transform parent, string name, Vector3 hipPos, Material shortsMat, Material socksMat, Material bootMat)
+    private PlayerLegJoints CreateLegHierarchy(Transform parent, string name, Vector3 hipPos, Material shortsMat, Material socksMat, Material bootMat, Material soleplateMat, Material studMat)
     {
         GameObject legRoot = new GameObject(name);
         legRoot.transform.SetParent(parent, false);
@@ -632,10 +1089,37 @@ public class MatchBootstrapper : MonoBehaviour
         GameObject boot = GameObject.CreatePrimitive(PrimitiveType.Cube);
         boot.name = "CleatBoot";
         boot.transform.SetParent(ankleJoint.transform, false);
-        boot.transform.localPosition = new Vector3(0f, 0f, 0.08f);
-        boot.transform.localScale = new Vector3(0.14f, 0.10f, 0.28f);
+        boot.transform.localPosition = new Vector3(0f, -0.02f, 0.08f);
+        boot.transform.localScale = new Vector3(0.13f, 0.09f, 0.27f);
         DestroyImmediate(boot.GetComponent<Collider>());
         boot.GetComponent<MeshRenderer>().sharedMaterial = bootMat;
+
+        // Sleek Chrome Soleplate underneath
+        GameObject soleplate = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        soleplate.name = "Soleplate";
+        soleplate.transform.SetParent(boot.transform, false);
+        soleplate.transform.localPosition = new Vector3(0f, -0.52f, 0f);
+        soleplate.transform.localScale = new Vector3(0.98f, 0.10f, 0.98f);
+        DestroyImmediate(soleplate.GetComponent<Collider>());
+        soleplate.GetComponent<MeshRenderer>().sharedMaterial = soleplateMat;
+
+        // 4 Traction Studs under soleplate
+        Vector3[] studOffsets = {
+            new Vector3(-0.35f, -0.55f, 0.35f),
+            new Vector3(0.35f, -0.55f, 0.35f),
+            new Vector3(-0.35f, -0.55f, -0.35f),
+            new Vector3(0.35f, -0.55f, -0.35f)
+        };
+        for (int s = 0; s < studOffsets.Length; s++)
+        {
+            GameObject stud = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            stud.name = $"Stud_{s}";
+            stud.transform.SetParent(soleplate.transform, false);
+            stud.transform.localPosition = studOffsets[s];
+            stud.transform.localScale = new Vector3(0.22f, 0.45f, 0.22f);
+            DestroyImmediate(stud.GetComponent<Collider>());
+            stud.GetComponent<MeshRenderer>().sharedMaterial = studMat;
+        }
 
         return new PlayerLegJoints { hip = legRoot.transform, knee = kneeJoint.transform, ankle = ankleJoint.transform };
     }

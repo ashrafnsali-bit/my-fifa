@@ -429,13 +429,14 @@ namespace Football.Locomotion
                     if (rightArm != null) rightArm.localRotation = initialRightArmRot * Quaternion.Euler(-armAngle, 0f, -armFlare);
                 }
 
-                // 5. Torso: vertical bounce, sprint forward pitch, centrifugal banking, and spinal counter-twist
-                float shoulderTwist = -sinL * (isSprinting ? 7.0f : 3.5f);
+                // 5. Torso: vertical bounce, sprint forward pitch, centrifugal banking, spinal counter-twist, and lateral weight sway
+                float shoulderTwist = -sinL * (isSprinting ? 7.5f : 4.0f);
+                float lateralSway = -sinL * (isSprinting ? 0.038f : 0.024f); // Authentic human physical weight transfer
                 if (torso != null)
                 {
                     float bounce = Mathf.Abs(sinL) * torsoBounceHeight;
                     float heightDrop = (hasBall ? -0.032f : 0f) + (isGK ? -0.055f : 0f);
-                    torso.localPosition = initialTorsoLocalPos + new Vector3(0f, bounce + heightDrop, 0f);
+                    torso.localPosition = initialTorsoLocalPos + new Vector3(lateralSway, bounce + heightDrop, 0f);
                     torso.localRotation = initialTorsoLocalRot * Quaternion.Euler(currentPitchAngle, shoulderTwist, currentBankAngle);
                 }
             }
@@ -495,22 +496,29 @@ namespace Football.Locomotion
                 }
                 else
                 {
-                    // Regular idle breathing, stance balance recovery
-                    float breath = Mathf.Sin(Time.time * 2.2f) * 0.012f;
+                    // Regular idle breathing, natural weight shifting between legs
+                    float breath = Mathf.Sin(Time.time * 2.2f) * 0.014f;
+                    float weightShift = Mathf.Sin(Time.time * 0.8f); // slow 4-second shift
+                    float legRelaxL = weightShift > 0.3f ? 4f : 0f;
+                    float legRelaxR = weightShift < -0.3f ? 4f : 0f;
 
-                    if (leftLeg != null) leftLeg.localRotation = Quaternion.Slerp(leftLeg.localRotation, initialLeftLegRot, dt * 10f);
-                    if (rightLeg != null) rightLeg.localRotation = Quaternion.Slerp(rightLeg.localRotation, initialRightLegRot, dt * 10f);
-                    if (leftKnee != null) leftKnee.localRotation = Quaternion.Slerp(leftKnee.localRotation, initialLeftKneeRot, dt * 10f);
-                    if (rightKnee != null) rightKnee.localRotation = Quaternion.Slerp(rightKnee.localRotation, initialRightKneeRot, dt * 10f);
-                    if (leftAnkle != null) leftAnkle.localRotation = Quaternion.Slerp(leftAnkle.localRotation, initialLeftAnkleRot, dt * 10f);
-                    if (rightAnkle != null) rightAnkle.localRotation = Quaternion.Slerp(rightAnkle.localRotation, initialRightAnkleRot, dt * 10f);
-                    if (leftArm != null) leftArm.localRotation = Quaternion.Slerp(leftArm.localRotation, initialLeftArmRot, dt * 10f);
-                    if (rightArm != null) rightArm.localRotation = Quaternion.Slerp(rightArm.localRotation, initialRightArmRot, dt * 10f);
+                    Quaternion idleLegL = initialLeftLegRot * Quaternion.Euler(legRelaxL, 0f, -legRelaxL * 0.5f);
+                    Quaternion idleLegR = initialRightLegRot * Quaternion.Euler(legRelaxR, 0f, legRelaxR * 0.5f);
+
+                    if (leftLeg != null) leftLeg.localRotation = Quaternion.Slerp(leftLeg.localRotation, idleLegL, dt * 6f);
+                    if (rightLeg != null) rightLeg.localRotation = Quaternion.Slerp(rightLeg.localRotation, idleLegR, dt * 6f);
+                    if (leftKnee != null) leftKnee.localRotation = Quaternion.Slerp(leftKnee.localRotation, initialLeftKneeRot * Quaternion.Euler(legRelaxL * 1.5f, 0f, 0f), dt * 6f);
+                    if (rightKnee != null) rightKnee.localRotation = Quaternion.Slerp(rightKnee.localRotation, initialRightKneeRot * Quaternion.Euler(legRelaxR * 1.5f, 0f, 0f), dt * 6f);
+                    if (leftAnkle != null) leftAnkle.localRotation = Quaternion.Slerp(leftAnkle.localRotation, initialLeftAnkleRot, dt * 8f);
+                    if (rightAnkle != null) rightAnkle.localRotation = Quaternion.Slerp(rightAnkle.localRotation, initialRightAnkleRot, dt * 8f);
+                    if (leftArm != null) leftArm.localRotation = Quaternion.Slerp(leftArm.localRotation, initialLeftArmRot * Quaternion.Euler(0f, 0f, 3f + breath * 35f), dt * 8f);
+                    if (rightArm != null) rightArm.localRotation = Quaternion.Slerp(rightArm.localRotation, initialRightArmRot * Quaternion.Euler(0f, 0f, -3f - breath * 35f), dt * 8f);
 
                     if (torso != null)
                     {
-                        torso.localPosition = Vector3.Lerp(torso.localPosition, initialTorsoLocalPos + new Vector3(0f, breath, 0f), dt * 10f);
-                        torso.localRotation = Quaternion.Slerp(torso.localRotation, initialTorsoLocalRot, dt * 8f);
+                        float idleSway = weightShift * 0.012f;
+                        torso.localPosition = Vector3.Lerp(torso.localPosition, initialTorsoLocalPos + new Vector3(idleSway, breath, 0f), dt * 8f);
+                        torso.localRotation = Quaternion.Slerp(torso.localRotation, initialTorsoLocalRot * Quaternion.Euler(0f, weightShift * 2.0f, weightShift * 1.5f), dt * 6f);
                     }
                 }
             }

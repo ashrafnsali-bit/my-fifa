@@ -258,8 +258,11 @@ namespace Football.PhysicsEngine
             transform.position = newPosition;
             if (rb != null)
             {
+                rb.isKinematic = false;
+                rb.position = newPosition;
                 rb.linearVelocity = Vector3.zero;
                 rb.angularVelocity = Vector3.zero;
+                rb.WakeUp();
             }
         }
     }

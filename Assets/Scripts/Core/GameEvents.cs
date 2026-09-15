@@ -76,6 +76,7 @@ namespace Football.Core
         public static event Action OnWoodworkHit;
         public static event Action OnGoalNetHit;
         public static event Action<int> OnGoalkeeperSave; // savingTeamId
+        public static event Action OnCameraSnapRequested;
         public static event Action<float> OnCrowdExcitementChanged; // 0.0 to 1.0 intensity
 
         public static MatchState CurrentMatchState { get; set; } = MatchState.KickOff;
@@ -106,5 +107,6 @@ namespace Football.Core
         public static void TriggerGoalNetHit() => OnGoalNetHit?.Invoke();
         public static void TriggerGoalkeeperSave(int teamId) => OnGoalkeeperSave?.Invoke(teamId);
         public static void TriggerCrowdExcitement(float intensity) => OnCrowdExcitementChanged?.Invoke(Mathf.Clamp01(intensity));
+        public static void TriggerCameraSnapRequested() => OnCameraSnapRequested?.Invoke();
     }
 }

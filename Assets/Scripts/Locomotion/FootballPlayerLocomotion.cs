@@ -52,11 +52,15 @@ namespace Football.Locomotion
             col = GetComponent<CapsuleCollider>();
             runtimeState = GetComponent<PlayerRuntimeState>();
 
-            rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
+            rb.useGravity = false;
+            rb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ | RigidbodyConstraints.FreezePositionY;
             rb.interpolation = RigidbodyInterpolation.Interpolate;
             rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
 
-            initialSpawnPosition = transform.position;
+            Vector3 spawnP = transform.position;
+            spawnP.y = 0f;
+            transform.position = spawnP;
+            initialSpawnPosition = spawnP;
         }
 
         public void SetMovementInput(Vector2 input, bool sprintRequested)
@@ -83,6 +87,15 @@ namespace Football.Locomotion
         {
             if (runtimeState.isSentOff) return;
 
+            // Strict grounding enforcement against PhysX de-penetration bounce
+            if (rb != null && Mathf.Abs(rb.position.y) > 0.001f)
+            {
+                Vector3 fixPos = rb.position;
+                fixPos.y = 0f;
+                rb.position = fixPos;
+                rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
+            }
+
             float dt = Time.fixedDeltaTime;
             UpdateLocomotion(dt);
             UpdateDribbling(dt);
@@ -90,6 +103,13 @@ namespace Football.Locomotion
 
         private void LateUpdate()
         {
+            if (Mathf.Abs(transform.position.y) > 0.001f)
+            {
+                Vector3 tp = transform.position;
+                tp.y = 0f;
+                transform.position = tp;
+            }
+
             UpdateBlobShadowPosition();
         }
 
@@ -105,6 +125,18 @@ namespace Football.Locomotion
 
         private void UpdateLocomotion(float dt)
         {
+            // During KickOff, hold position strictly at spawn spot while allowing rotation aiming
+            if (GameEvents.CurrentMatchState == MatchState.KickOff)
+            {
+                currentVelocity = Vector3.zero;
+                if (targetMoveDirection.sqrMagnitude > 0.01f)
+                {
+                    Quaternion targetRot = Quaternion.LookRotation(targetMoveDirection, Vector3.up);
+                    rb.MoveRotation(Quaternion.RotateTowards(rb.rotation, targetRot, turnSpeed * dt));
+                }
+                return;
+            }
+
             // Compute attribute-influenced speeds
             float sprintAttr = runtimeState.attributes != null ? runtimeState.attributes.sprintSpeed : 75f;
             float accelAttr = runtimeState.attributes != null ? runtimeState.attributes.acceleration : 75f;
@@ -122,23 +154,36 @@ namespace Football.Locomotion
             float currentAccel = targetMoveDirection.sqrMagnitude > 0.01f ? accelerationRate * (accelAttr / 70f) * gkAccelMult : decelerationRate;
             currentVelocity = Vector3.MoveTowards(currentVelocity, targetVel, currentAccel * dt);
 
-            // Move rigidbody
+            // Move rigidbody strictly on ground plane
             Vector3 nextPos = rb.position + currentVelocity * dt;
+            nextPos.y = 0.0f;
             nextPos = PitchConstants.ClampToPitch(nextPos, 0.5f);
+            nextPos.y = 0.0f;
             rb.MovePosition(nextPos);
 
             // Rotation towards movement or ball if goalkeeper
             var ballObj = FootballBall.Instance;
 
-            // Goalkeepers lock facing onto ball for instant saving stance; outfield players face motion
+            // Goalkeepers lock facing onto ball for instant saving stance (or face pitch when ball is in net / kickoff)
             if (isGK && !runtimeState.isHoldingBallInHands && ballObj != null)
             {
-                Vector3 toBallDir = ballObj.transform.position - transform.position;
-                toBallDir.y = 0f;
-                if (toBallDir.sqrMagnitude > 0.05f)
+                Vector3 faceDir;
+                bool ballBehindGoal = Mathf.Abs(ballObj.transform.position.z) >= PitchConstants.HalfLength - 0.25f;
+                if (ballBehindGoal || GameEvents.CurrentMatchState != MatchState.InPlay)
                 {
-                    Quaternion faceBallRot = Quaternion.LookRotation(toBallDir.normalized, Vector3.up);
-                    rb.MoveRotation(Quaternion.RotateTowards(rb.rotation, faceBallRot, turnSpeed * 1.5f * dt));
+                    Vector3 oppGoal = PitchConstants.GetTargetGoalCenter(runtimeState.teamId);
+                    faceDir = oppGoal - transform.position;
+                }
+                else
+                {
+                    faceDir = ballObj.transform.position - transform.position;
+                }
+
+                faceDir.y = 0f;
+                if (faceDir.sqrMagnitude > 0.05f)
+                {
+                    Quaternion faceRot = Quaternion.LookRotation(faceDir.normalized, Vector3.up);
+                    rb.MoveRotation(Quaternion.RotateTowards(rb.rotation, faceRot, turnSpeed * 1.5f * dt));
                 }
             }
             else if (targetMoveDirection.sqrMagnitude > 0.01f)
@@ -433,9 +478,11 @@ namespace Football.Locomotion
         public void ResetPosition(Vector3? customPosition = null)
         {
             Vector3 target = customPosition ?? initialSpawnPosition;
+            target.y = 0f;
             transform.position = target;
             if (rb != null)
             {
+                rb.position = target;
                 rb.linearVelocity = Vector3.zero;
                 rb.angularVelocity = Vector3.zero;
             }

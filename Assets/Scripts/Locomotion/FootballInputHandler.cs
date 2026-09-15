@@ -25,7 +25,7 @@ namespace Football.Locomotion
         {
             if (!isHumanControlled || runtimeState.isSentOff) return;
 
-            if (GameEvents.CurrentMatchState == MatchState.GoalScored || GameEvents.CurrentMatchState == MatchState.KickOff)
+            if (GameEvents.CurrentMatchState == MatchState.GoalScored)
             {
                 locomotion.SetMovementInput(Vector2.zero, false);
                 return;
@@ -122,7 +122,8 @@ namespace Football.Locomotion
             Vector3 toBall = ball != null ? (ball.transform.position - transform.position) : Vector3.zero;
             toBall.y = 0f;
             float distToBall = ball != null ? toBall.magnitude : 99f;
-            bool isInPossession = runtimeState.hasBall || distToBall < 3.8f;
+            bool isKickoff = (GameEvents.CurrentMatchState == MatchState.KickOff);
+            bool isInPossession = runtimeState.hasBall || distToBall < 3.8f || isKickoff;
 
             bool kickDown = spaceDown || lDown;
             bool kickHeld = spaceHeld || lHeld;

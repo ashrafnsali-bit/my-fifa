@@ -989,5 +989,245 @@ namespace Football.Procedural
             tex.Apply();
             return tex;
         }
+
+        public static Texture2D CreateCaptainArmbandTexture()
+        {
+            int w = 128, h = 64;
+            var tex = new Texture2D(w, h, TextureFormat.RGBA32, true);
+            tex.wrapMode = TextureWrapMode.Clamp;
+
+            Color gold = new Color(0.98f, 0.82f, 0.12f);
+            Color darkGold = new Color(0.82f, 0.65f, 0.08f);
+            Color black = new Color(0.12f, 0.12f, 0.14f);
+
+            Color[] pixels = new Color[w * h];
+            for (int y = 0; y < h; y++)
+            {
+                float ny = (float)y / h;
+                for (int x = 0; x < w; x++)
+                {
+                    float nx = (float)x / w;
+                    Color c = (ny > 0.15f && ny < 0.85f) ? gold : darkGold;
+
+                    // Black top and bottom border stripes
+                    if (ny < 0.08f || ny > 0.92f) c = black;
+
+                    // Bold Captain "C" in center
+                    float cx = (nx - 0.5f) * 2.2f;
+                    float cy = (ny - 0.5f) * 2.0f;
+                    float r = Mathf.Sqrt(cx * cx + cy * cy);
+                    if (r > 0.38f && r < 0.68f && !(cx > 0.15f && Mathf.Abs(cy) < 0.38f))
+                    {
+                        c = black;
+                    }
+
+                    pixels[y * w + x] = c;
+                }
+            }
+            tex.SetPixels(pixels);
+            tex.Apply();
+            return tex;
+        }
+
+        public static Texture2D CreateBootTexture(Color baseColor, Color accentColor)
+        {
+            int size = 256;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, true);
+            tex.wrapMode = TextureWrapMode.Clamp;
+            tex.filterMode = FilterMode.Trilinear;
+
+            Color[] pixels = new Color[size * size];
+            Color carbon = new Color(0.12f, 0.12f, 0.15f);
+
+            for (int y = 0; y < size; y++)
+            {
+                float ny = (float)y / size;
+                for (int x = 0; x < size; x++)
+                {
+                    float nx = (float)x / size;
+                    Color c = baseColor;
+
+                    // Micro synthetic speed grip texture
+                    float microTexture = Mathf.Sin(nx * 120f) * Mathf.Cos(ny * 120f) * 0.05f;
+                    c.r = Mathf.Clamp01(c.r + microTexture);
+                    c.g = Mathf.Clamp01(c.g + microTexture);
+                    c.b = Mathf.Clamp01(c.b + microTexture);
+
+                    // Dynamic lateral speed stripes / swoosh
+                    float stripe1 = Mathf.Abs(ny - (nx * 0.75f + 0.15f));
+                    float stripe2 = Mathf.Abs(ny - (nx * 0.75f + 0.28f));
+                    if (stripe1 < 0.045f || stripe2 < 0.045f)
+                    {
+                        c = accentColor;
+                    }
+
+                    // Heel counter reinforcement
+                    if (nx < 0.20f)
+                    {
+                        c = Color.Lerp(carbon, c, nx / 0.20f);
+                    }
+
+                    // Laces tongue zone
+                    if (nx > 0.35f && nx < 0.75f && ny > 0.72f)
+                    {
+                        float laceGrid = Mathf.Sin(nx * 80f) * Mathf.Cos(ny * 40f);
+                        if (laceGrid > 0.3f) c = Color.white;
+                        else c = carbon;
+                    }
+
+                    pixels[y * size + x] = c;
+                }
+            }
+            tex.SetPixels(pixels);
+            tex.Apply();
+            return tex;
+        }
+
+        public static Texture2D CreateBootSoleplateTexture(Color plateColor, Color studColor)
+        {
+            int size = 128;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, true);
+            tex.wrapMode = TextureWrapMode.Clamp;
+
+            Color[] pixels = new Color[size * size];
+            Vector2[] studPoints = {
+                new Vector2(0.25f, 0.25f), new Vector2(0.75f, 0.25f),
+                new Vector2(0.20f, 0.55f), new Vector2(0.80f, 0.55f),
+                new Vector2(0.25f, 0.85f), new Vector2(0.75f, 0.85f)
+            };
+
+            for (int y = 0; y < size; y++)
+            {
+                float ny = (float)y / size;
+                for (int x = 0; x < size; x++)
+                {
+                    float nx = (float)x / size;
+                    Color c = plateColor;
+
+                    // Chrome metallic gradient
+                    c = Color.Lerp(c * 0.8f, c * 1.25f, ny);
+
+                    // High-visibility traction studs
+                    for (int s = 0; s < studPoints.Length; s++)
+                    {
+                        float d = Vector2.Distance(new Vector2(nx, ny), studPoints[s]);
+                        if (d < 0.09f)
+                        {
+                            c = Color.Lerp(studColor, Color.white, (0.09f - d) / 0.09f);
+                            break;
+                        }
+                    }
+
+                    pixels[y * size + x] = c;
+                }
+            }
+            tex.SetPixels(pixels);
+            tex.Apply();
+            return tex;
+        }
+
+        public static Texture2D CreateBeardTexture(Color beardColor)
+        {
+            int size = 128;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, true);
+            tex.wrapMode = TextureWrapMode.Clamp;
+
+            Color[] pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                float ny = (float)y / size;
+                for (int x = 0; x < size; x++)
+                {
+                    float nx = (float)x / size;
+
+                    // Jawline beard contour (covers bottom half and sides of chin)
+                    float distFromChin = Vector2.Distance(new Vector2(nx, ny), new Vector2(0.5f, 0.2f));
+                    float alpha = 0f;
+                    if (ny < 0.55f && Mathf.Abs(nx - 0.5f) < 0.42f)
+                    {
+                        alpha = Mathf.Clamp01((0.55f - ny) * 3.5f);
+                        float stubble = Mathf.PerlinNoise(nx * 32f, ny * 32f);
+                        alpha *= Mathf.Lerp(0.65f, 1.0f, stubble);
+                    }
+
+                    pixels[y * size + x] = new Color(beardColor.r, beardColor.g, beardColor.b, alpha * 0.92f);
+                }
+            }
+            tex.SetPixels(pixels);
+            tex.Apply();
+            return tex;
+        }
+
+        public static Texture2D CreateGoalkeeperGloveTexture(Color gloveBack, Color palmColor)
+        {
+            int size = 256;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, true);
+            tex.wrapMode = TextureWrapMode.Clamp;
+
+            Color[] pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                float ny = (float)y / size;
+                for (int x = 0; x < size; x++)
+                {
+                    float nx = (float)x / size;
+                    Color c = (ny > 0.5f) ? palmColor : gloveBack;
+
+                    // Embossed silicone punch zone grid on back of hand
+                    if (ny <= 0.5f)
+                    {
+                        float grid = Mathf.Sin(nx * 40f) * Mathf.Cos(ny * 40f);
+                        if (grid > 0.35f) c = Color.Lerp(c, Color.white, 0.55f);
+                    }
+                    else
+                    {
+                        // High-tack latex micro-foam texture
+                        float latexFoam = Mathf.PerlinNoise(nx * 60f, ny * 60f) * 0.08f;
+                        c.r += latexFoam; c.g += latexFoam; c.b += latexFoam;
+                    }
+
+                    pixels[y * size + x] = c;
+                }
+            }
+            tex.SetPixels(pixels);
+            tex.Apply();
+            return tex;
+        }
+
+        public static Texture2D CreateHairFadeTexture(Color hairColor)
+        {
+            int size = 128;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, true);
+            tex.wrapMode = TextureWrapMode.Clamp;
+
+            Color[] pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                float ny = (float)y / size;
+                for (int x = 0; x < size; x++)
+                {
+                    float nx = (float)x / size;
+                    Color c = hairColor;
+
+                    // Natural hair strands grain
+                    float strand = Mathf.Sin(nx * 90f + ny * 15f) * 0.06f;
+                    c.r = Mathf.Clamp01(c.r + strand);
+                    c.g = Mathf.Clamp01(c.g + strand);
+                    c.b = Mathf.Clamp01(c.b + strand);
+
+                    // Fade gradient on lower temple and neckline
+                    if (ny < 0.35f)
+                    {
+                        float fadeT = ny / 0.35f;
+                        c = Color.Lerp(hairColor * 0.6f, c, fadeT);
+                    }
+
+                    pixels[y * size + x] = c;
+                }
+            }
+            tex.SetPixels(pixels);
+            tex.Apply();
+            return tex;
+        }
     }
 }

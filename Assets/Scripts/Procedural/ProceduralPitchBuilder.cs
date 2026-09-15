@@ -91,10 +91,16 @@ namespace Football.Procedural
                 float centerZ = startZ + (i + 0.5f) * stripeLength;
                 stripe.transform.position = new Vector3(0f, -0.05f, centerZ);
                 stripe.transform.localScale = new Vector3(PitchConstants.PitchWidth + 8.0f, 0.1f, stripeLength);
+                DestroyImmediate(stripe.GetComponent<Collider>());
 
                 var renderer = stripe.GetComponent<MeshRenderer>();
                 renderer.sharedMaterial = (i % 2 == 0) ? turfMaterialLight : turfMaterialDark;
             }
+
+            // Single unified, continuous pitch ground collider with 0 internal edge bumps
+            var pitchCol = turfRoot.AddComponent<BoxCollider>();
+            pitchCol.center = new Vector3(0f, -0.05f, 0f);
+            pitchCol.size = new Vector3(PitchConstants.PitchWidth + 16.0f, 0.1f, PitchConstants.PitchLength + 16.0f);
         }
 
         private void BuildPitchLines()
@@ -104,59 +110,64 @@ namespace Football.Procedural
 
             float halfW = PitchConstants.HalfWidth;
             float halfL = PitchConstants.HalfLength;
+            float lineY = 0.025f;
 
             // 1. Boundary Perimeter Lines
-            CreateLineQuad(linesRoot.transform, "Touchline_Left", new Vector3(-halfW, 0.01f, 0f), new Vector3(lineWidth, 1f, PitchConstants.PitchLength));
-            CreateLineQuad(linesRoot.transform, "Touchline_Right", new Vector3(halfW, 0.01f, 0f), new Vector3(lineWidth, 1f, PitchConstants.PitchLength));
-            CreateLineQuad(linesRoot.transform, "GoalLine_Home", new Vector3(0f, 0.01f, -halfL), new Vector3(PitchConstants.PitchWidth, 1f, lineWidth));
-            CreateLineQuad(linesRoot.transform, "GoalLine_Away", new Vector3(0f, 0.01f, halfL), new Vector3(PitchConstants.PitchWidth, 1f, lineWidth));
+            // Touchlines run along Z: width is lineWidth along X, length is PitchLength along Z
+            CreateLineQuad(linesRoot.transform, "Touchline_Left", new Vector3(-halfW, lineY, 0f), new Vector3(lineWidth, PitchConstants.PitchLength, 1f));
+            CreateLineQuad(linesRoot.transform, "Touchline_Right", new Vector3(halfW, lineY, 0f), new Vector3(lineWidth, PitchConstants.PitchLength, 1f));
 
-            // 2. Halfway Line
-            CreateLineQuad(linesRoot.transform, "HalfwayLine", new Vector3(0f, 0.01f, 0f), new Vector3(PitchConstants.PitchWidth, 1f, lineWidth));
+            // GoalLines run along X: length is PitchWidth along X, thickness is lineWidth along Z
+            CreateLineQuad(linesRoot.transform, "GoalLine_Home", new Vector3(0f, lineY, -halfL), new Vector3(PitchConstants.PitchWidth, lineWidth, 1f));
+            CreateLineQuad(linesRoot.transform, "GoalLine_Away", new Vector3(0f, lineY, halfL), new Vector3(PitchConstants.PitchWidth, lineWidth, 1f));
+
+            // 2. Halfway Line runs along X: length is PitchWidth along X, thickness is lineWidth along Z
+            CreateLineQuad(linesRoot.transform, "HalfwayLine", new Vector3(0f, lineY, 0f), new Vector3(PitchConstants.PitchWidth, lineWidth, 1f));
 
             // 3. Center Circle (9.15m regulation radius) & Center Kickoff Spot
-            CreateCircleLine(linesRoot.transform, "CenterCircle", new Vector3(0f, 0.01f, 0f), 9.15f, 0f, 360f, 48);
-            CreateSpotDisc(linesRoot.transform, "CenterSpot", new Vector3(0f, 0.012f, 0f), 0.24f);
+            CreateCircleLine(linesRoot.transform, "CenterCircle", new Vector3(0f, lineY, 0f), 9.15f, 0f, 360f, 64);
+            CreateSpotDisc(linesRoot.transform, "CenterSpot", new Vector3(0f, lineY + 0.002f, 0f), 0.28f);
 
             // 4. Penalty Boxes
-            BuildBoxLines(linesRoot.transform, "HomePenaltyBox", -halfL, PitchConstants.PenaltyBoxLength, PitchConstants.PenaltyBoxWidth);
-            BuildBoxLines(linesRoot.transform, "AwayPenaltyBox", halfL, -PitchConstants.PenaltyBoxLength, PitchConstants.PenaltyBoxWidth);
+            BuildBoxLines(linesRoot.transform, "HomePenaltyBox", -halfL, PitchConstants.PenaltyBoxLength, PitchConstants.PenaltyBoxWidth, lineY);
+            BuildBoxLines(linesRoot.transform, "AwayPenaltyBox", halfL, -PitchConstants.PenaltyBoxLength, PitchConstants.PenaltyBoxWidth, lineY);
 
             // 5. Six-Yard Goal Boxes
-            BuildBoxLines(linesRoot.transform, "HomeSixYardBox", -halfL, PitchConstants.SixYardBoxLength, PitchConstants.SixYardBoxWidth);
-            BuildBoxLines(linesRoot.transform, "AwaySixYardBox", halfL, -PitchConstants.SixYardBoxLength, PitchConstants.SixYardBoxWidth);
+            BuildBoxLines(linesRoot.transform, "HomeSixYardBox", -halfL, PitchConstants.SixYardBoxLength, PitchConstants.SixYardBoxWidth, lineY);
+            BuildBoxLines(linesRoot.transform, "AwaySixYardBox", halfL, -PitchConstants.SixYardBoxLength, PitchConstants.SixYardBoxWidth, lineY);
 
             // 6. Penalty Spots (11m / 12 yards from goal lines)
             float homePenZ = -halfL + 11.0f;
             float awayPenZ = halfL - 11.0f;
-            CreateSpotDisc(linesRoot.transform, "HomePenaltySpot", new Vector3(0f, 0.012f, homePenZ), 0.22f);
-            CreateSpotDisc(linesRoot.transform, "AwayPenaltySpot", new Vector3(0f, 0.012f, awayPenZ), 0.22f);
+            CreateSpotDisc(linesRoot.transform, "HomePenaltySpot", new Vector3(0f, lineY + 0.002f, homePenZ), 0.24f);
+            CreateSpotDisc(linesRoot.transform, "AwayPenaltySpot", new Vector3(0f, lineY + 0.002f, awayPenZ), 0.24f);
 
             // 7. Penalty D-Arcs (9.15m radius curving outside penalty box)
-            CreateCircleLine(linesRoot.transform, "HomePenaltyArc", new Vector3(0f, 0.01f, homePenZ), 9.15f, -53f, 106f, 20);
-            CreateCircleLine(linesRoot.transform, "AwayPenaltyArc", new Vector3(0f, 0.01f, awayPenZ), 9.15f, 127f, 106f, 20);
+            CreateCircleLine(linesRoot.transform, "HomePenaltyArc", new Vector3(0f, lineY, homePenZ), 9.15f, -53f, 106f, 24);
+            CreateCircleLine(linesRoot.transform, "AwayPenaltyArc", new Vector3(0f, lineY, awayPenZ), 9.15f, 127f, 106f, 24);
 
             // 8. Corner Quadrant Arcs (1m radius quarter-circles at all 4 corners)
-            CreateCircleLine(linesRoot.transform, "CornerArc_SW", new Vector3(-halfW, 0.01f, -halfL), 1.0f, 0f, 90f, 12);
-            CreateCircleLine(linesRoot.transform, "CornerArc_SE", new Vector3(halfW, 0.01f, -halfL), 1.0f, 270f, 90f, 12);
-            CreateCircleLine(linesRoot.transform, "CornerArc_NW", new Vector3(-halfW, 0.01f, halfL), 1.0f, 90f, 90f, 12);
-            CreateCircleLine(linesRoot.transform, "CornerArc_NE", new Vector3(halfW, 0.01f, halfL), 1.0f, 180f, 90f, 12);
+            CreateCircleLine(linesRoot.transform, "CornerArc_SW", new Vector3(-halfW, lineY, -halfL), 1.0f, 0f, 90f, 16);
+            CreateCircleLine(linesRoot.transform, "CornerArc_SE", new Vector3(halfW, lineY, -halfL), 1.0f, 270f, 90f, 16);
+            CreateCircleLine(linesRoot.transform, "CornerArc_NW", new Vector3(-halfW, lineY, halfL), 1.0f, 90f, 90f, 16);
+            CreateCircleLine(linesRoot.transform, "CornerArc_NE", new Vector3(halfW, lineY, halfL), 1.0f, 180f, 90f, 16);
         }
 
-        private void BuildBoxLines(Transform parent, string boxName, float goalLineZ, float lengthDirection, float boxWidth)
+        private void BuildBoxLines(Transform parent, string boxName, float goalLineZ, float lengthDirection, float boxWidth, float lineY)
         {
             GameObject boxObj = new GameObject(boxName);
             boxObj.transform.SetParent(parent, false);
 
             float halfW = boxWidth * 0.5f;
             float farZ = goalLineZ + lengthDirection;
+            float sideLen = Mathf.Abs(lengthDirection);
 
-            // Front edge line
-            CreateLineQuad(boxObj.transform, "FrontLine", new Vector3(0f, 0.01f, farZ), new Vector3(boxWidth, 1f, lineWidth));
-            // Left edge line
-            CreateLineQuad(boxObj.transform, "LeftLine", new Vector3(-halfW, 0.01f, goalLineZ + lengthDirection * 0.5f), new Vector3(lineWidth, 1f, Mathf.Abs(lengthDirection)));
-            // Right edge line
-            CreateLineQuad(boxObj.transform, "RightLine", new Vector3(halfW, 0.01f, goalLineZ + lengthDirection * 0.5f), new Vector3(lineWidth, 1f, Mathf.Abs(lengthDirection)));
+            // Front edge line (runs along X): width along X is boxWidth, thickness along Z is lineWidth
+            CreateLineQuad(boxObj.transform, "FrontLine", new Vector3(0f, lineY, farZ), new Vector3(boxWidth, lineWidth, 1f));
+            // Left edge line (runs along Z): thickness along X is lineWidth, length along Z is sideLen
+            CreateLineQuad(boxObj.transform, "LeftLine", new Vector3(-halfW, lineY, goalLineZ + lengthDirection * 0.5f), new Vector3(lineWidth, sideLen, 1f));
+            // Right edge line (runs along Z): thickness along X is lineWidth, length along Z is sideLen
+            CreateLineQuad(boxObj.transform, "RightLine", new Vector3(halfW, lineY, goalLineZ + lengthDirection * 0.5f), new Vector3(lineWidth, sideLen, 1f));
         }
 
         private void CreateLineQuad(Transform parent, string name, Vector3 pos, Vector3 scale)
@@ -408,6 +419,8 @@ namespace Football.Procedural
 
         private void OnTriggerEnter(Collider other)
         {
+            if (GameEvents.CurrentMatchState != MatchState.InPlay) return;
+
             Rigidbody rb = other.attachedRigidbody;
             if (rb == null || !IsBall(other, rb)) return;
 
@@ -426,6 +439,8 @@ namespace Football.Procedural
 
         private void OnTriggerStay(Collider other)
         {
+            if (GameEvents.CurrentMatchState != MatchState.InPlay && GameEvents.CurrentMatchState != MatchState.GoalScored) return;
+
             Rigidbody rb = other.attachedRigidbody;
             if (rb == null || !IsBall(other, rb)) return;
 
