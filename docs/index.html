@@ -1,346 +1,133 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>FIFA 26 - لعبة كرة القدم</title>
-  <meta name="description" content="لعبة كرة قدم واقعية مبنية بـ Unity - FIFA 26 Fan Project"/>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    body {
-      font-family: 'Tajawal', sans-serif;
-      background: #0a0e1a;
-      color: #fff;
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
-
-    /* Animated pitch background */
-    .bg {
-      position: fixed;
-      inset: 0;
-      background:
-        radial-gradient(ellipse at 50% 0%, rgba(0,200,80,0.12) 0%, transparent 60%),
-        radial-gradient(ellipse at 50% 100%, rgba(0,80,200,0.10) 0%, transparent 60%),
-        linear-gradient(135deg, #0a0e1a 0%, #0d1a2e 50%, #0a1a0e 100%);
-      z-index: 0;
-    }
-
-    /* Pitch lines */
-    .pitch-lines {
-      position: fixed;
-      inset: 0;
-      opacity: 0.04;
-      background-image:
-        linear-gradient(90deg, #0f0 1px, transparent 1px),
-        linear-gradient(#0f0 1px, transparent 1px);
-      background-size: 80px 80px;
-      z-index: 0;
-    }
-
-    /* Particles */
-    .particles {
-      position: fixed;
-      inset: 0;
-      z-index: 0;
-      overflow: hidden;
-    }
-    .particle {
-      position: absolute;
-      width: 3px;
-      height: 3px;
-      border-radius: 50%;
-      background: rgba(0, 255, 100, 0.6);
-      animation: float linear infinite;
-    }
-    @keyframes float {
-      0% { transform: translateY(100vh) scale(0); opacity: 0; }
-      10% { opacity: 1; }
-      90% { opacity: 1; }
-      100% { transform: translateY(-10vh) scale(1); opacity: 0; }
-    }
-
-    .container {
-      position: relative;
-      z-index: 1;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 40px 20px;
-      text-align: center;
-    }
-
-    /* Badge */
-    .badge {
-      display: inline-block;
-      background: linear-gradient(135deg, #00c853, #00b0ff);
-      color: #000;
-      font-size: 12px;
-      font-weight: 900;
-      padding: 6px 18px;
-      border-radius: 100px;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      margin-bottom: 24px;
-      animation: pulse 2s ease-in-out infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(0,200,83,0.4); }
-      50% { box-shadow: 0 0 0 12px rgba(0,200,83,0); }
-    }
-
-    /* Ball icon */
-    .ball-icon {
-      font-size: 80px;
-      margin-bottom: 16px;
-      display: block;
-      animation: spin 8s linear infinite, bob 3s ease-in-out infinite;
-      filter: drop-shadow(0 0 30px rgba(0,200,83,0.5));
-    }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    @keyframes bob {
-      0%, 100% { transform: translateY(0px) rotate(0deg); }
-      50% { transform: translateY(-15px) rotate(180deg); }
-    }
-
-    h1 {
-      font-size: clamp(36px, 8vw, 80px);
-      font-weight: 900;
-      background: linear-gradient(135deg, #ffffff 0%, #00e676 50%, #00b0ff 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      line-height: 1.1;
-      margin-bottom: 12px;
-    }
-
-    .subtitle {
-      font-size: clamp(16px, 3vw, 22px);
-      color: rgba(255,255,255,0.6);
-      margin-bottom: 40px;
-      font-weight: 400;
-    }
-
-    /* Score board */
-    .scoreboard {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 20px;
-      padding: 20px 40px;
-      margin-bottom: 40px;
-      backdrop-filter: blur(10px);
-    }
-    .team { font-size: 28px; font-weight: 900; letter-spacing: 2px; }
-    .team.home { color: #00e676; }
-    .team.away { color: #448aff; }
-    .score-display {
-      font-size: 48px;
-      font-weight: 900;
-      color: white;
-      padding: 0 20px;
-      font-variant-numeric: tabular-nums;
-    }
-
-    /* Features */
-    .features {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 16px;
-      max-width: 800px;
-      width: 100%;
-      margin-bottom: 48px;
-    }
-    .feature {
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 16px;
-      padding: 20px;
-      transition: all 0.3s ease;
-    }
-    .feature:hover {
-      background: rgba(0,230,118,0.08);
-      border-color: rgba(0,230,118,0.3);
-      transform: translateY(-4px);
-    }
-    .feature-icon { font-size: 32px; margin-bottom: 10px; display: block; }
-    .feature-title { font-size: 14px; font-weight: 700; color: rgba(255,255,255,0.9); }
-
-    /* Status */
-    .status-card {
-      background: linear-gradient(135deg, rgba(255,152,0,0.15), rgba(255,87,34,0.10));
-      border: 1px solid rgba(255,152,0,0.3);
-      border-radius: 20px;
-      padding: 28px 40px;
-      max-width: 560px;
-      margin-bottom: 36px;
-    }
-    .status-title {
-      font-size: 18px;
-      font-weight: 700;
-      color: #ffb74d;
-      margin-bottom: 10px;
-    }
-    .status-text {
-      font-size: 14px;
-      color: rgba(255,255,255,0.65);
-      line-height: 1.7;
-    }
-
-    /* Loading bar */
-    .progress-wrap {
-      width: 100%;
-      max-width: 340px;
-      height: 6px;
-      background: rgba(255,255,255,0.1);
-      border-radius: 100px;
-      overflow: hidden;
-      margin: 16px auto 0;
-    }
-    .progress-bar {
-      height: 100%;
-      background: linear-gradient(90deg, #00c853, #00b0ff);
-      border-radius: 100px;
-      animation: progress 3s ease-in-out infinite;
-    }
-    @keyframes progress {
-      0% { width: 0%; }
-      50% { width: 75%; }
-      100% { width: 100%; }
-    }
-
-    /* GitHub link */
-    .github-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      background: rgba(255,255,255,0.08);
-      border: 1px solid rgba(255,255,255,0.15);
-      color: white;
-      text-decoration: none;
-      padding: 14px 28px;
-      border-radius: 100px;
-      font-family: 'Tajawal', sans-serif;
-      font-size: 16px;
-      font-weight: 700;
-      transition: all 0.3s ease;
-    }
-    .github-btn:hover {
-      background: rgba(255,255,255,0.15);
-      border-color: rgba(255,255,255,0.3);
-      transform: scale(1.05);
-    }
-
-    .footer {
-      margin-top: 48px;
-      color: rgba(255,255,255,0.3);
-      font-size: 13px;
-    }
-  </style>
-</head>
-<body>
-
-<div class="bg"></div>
-<div class="pitch-lines"></div>
-<div class="particles" id="particles"></div>
-
-<div class="container">
-  <span class="badge">🔴 مباشر - قيد التطوير</span>
-
-  <span class="ball-icon">⚽</span>
-
-  <h1>FIFA 26</h1>
-  <p class="subtitle">مشروع كرة قدم واقعي مبني بـ Unity Engine</p>
-
-  <!-- Scoreboard preview -->
-  <div class="scoreboard">
-    <span class="team home">ARG</span>
-    <span class="score-display" id="score">0 – 0</span>
-    <span class="team away">FRA</span>
-  </div>
-
-  <!-- Features -->
-  <div class="features">
-    <div class="feature">
-      <span class="feature-icon">🧤</span>
-      <div class="feature-title">حارس مرمى ذكي</div>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Unity Web Player | fifa26</title>
+    <link rel="shortcut icon" href="TemplateData/favicon.ico">
+    <link rel="stylesheet" href="TemplateData/style.css">
+  </head>
+  <body>
+    <div id="unity-container" class="unity-desktop">
+      <canvas id="unity-canvas" width=960 height=600 tabindex="-1"></canvas>
+      <div id="unity-loading-bar">
+        <div id="unity-logo"></div>
+        <div id="unity-progress-bar-empty">
+          <div id="unity-progress-bar-full"></div>
+        </div>
+      </div>
+      <div id="unity-warning"> </div>
+      <div id="unity-footer">
+        <div id="unity-logo-title-footer"></div>
+        <div id="unity-fullscreen-button"></div>
+        <div id="unity-build-title">fifa26</div>
+      </div>
     </div>
-    <div class="feature">
-      <span class="feature-icon">🏃</span>
-      <div class="feature-title">توزيع واقعي للاعبين</div>
-    </div>
-    <div class="feature">
-      <span class="feature-icon">📹</span>
-      <div class="feature-title">كاميرا بث احترافية</div>
-    </div>
-    <div class="feature">
-      <span class="feature-icon">🏟️</span>
-      <div class="feature-title">ملعب إجرائي ثلاثي الأبعاد</div>
-    </div>
-    <div class="feature">
-      <span class="feature-icon">🎯</span>
-      <div class="feature-title">تكتيكات ذكاء اصطناعي</div>
-    </div>
-    <div class="feature">
-      <span class="feature-icon">🔊</span>
-      <div class="feature-title">تعليق صوتي وجمهور</div>
-    </div>
-  </div>
+    <script>
+      var canvas = document.querySelector("#unity-canvas");
 
-  <!-- Status -->
-  <div class="status-card">
-    <div class="status-title">⚙️ جاري تحضير النسخة المتصفح</div>
-    <p class="status-text">
-      اللعبة قيد البناء كـ WebGL لتشغيلها مباشرة في المتصفح.<br/>
-      قريباً ستتمكن من اللعب هنا بدون أي تنزيل!
-    </p>
-    <div class="progress-wrap">
-      <div class="progress-bar"></div>
-    </div>
-  </div>
+      // Shows a temporary message banner/ribbon for a few seconds, or
+      // a permanent error message on top of the canvas if type=='error'.
+      // If type=='warning', a yellow highlight color is used.
+      // Modify or remove this function to customize the visually presented
+      // way that non-critical warnings and error messages are presented to the
+      // user.
+      function unityShowBanner(msg, type) {
+        var warningBanner = document.querySelector("#unity-warning");
+        function updateBannerVisibility() {
+          warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
+        }
+        var div = document.createElement('div');
+        div.innerHTML = msg;
+        warningBanner.appendChild(div);
+        if (type == 'error') div.style = 'background: red; padding: 10px;';
+        else {
+          if (type == 'warning') div.style = 'background: yellow; padding: 10px;';
+          setTimeout(function() {
+            warningBanner.removeChild(div);
+            updateBannerVisibility();
+          }, 5000);
+        }
+        updateBannerVisibility();
+      }
 
-  <!-- GitHub -->
-  <a href="https://github.com/ashrafnsali-bit/my-fifa" class="github-btn" target="_blank">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
-      <path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.44 9.8 8.2 11.38.6.11.82-.26.82-.58v-2.03c-3.34.73-4.04-1.61-4.04-1.61-.54-1.38-1.33-1.75-1.33-1.75-1.09-.74.08-.73.08-.73 1.2.08 1.84 1.24 1.84 1.24 1.07 1.83 2.8 1.3 3.49 1 .11-.78.42-1.3.76-1.6-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 3-.4c1.02.005 2.04.14 3 .4 2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.48 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.22.7.82.58C20.57 21.8 24 17.3 24 12 24 5.37 18.63 0 12 0z"/>
-    </svg>
-    عرض الكود على GitHub
-  </a>
+      var buildUrl = "Build";
+      var loaderUrl = buildUrl + "/folder.loader.js";
+      var config = {
+        arguments: [],
+        dataUrl: buildUrl + "/folder.data.br",
+        frameworkUrl: buildUrl + "/folder.framework.js.br",
+        codeUrl: buildUrl + "/folder.wasm.br",
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: "DefaultCompany",
+        productName: "fifa26",
+        productVersion: "0.1.0",
+        showBanner: unityShowBanner,
+        // errorHandler: function(err, url, line) {
+        //    alert("error " + err + " occurred at line " + line);
+        //    // Return 'true' if you handled this error and don't want Unity
+        //    // to process it further, 'false' otherwise.
+        //    return true;
+        // },
+      };
 
-  <div class="footer">
-    FIFA 26 Fan Project • Unity Engine • ashrafnsali-bit
-  </div>
-</div>
+      // By default, Unity keeps WebGL canvas render target size matched with
+      // the DOM size of the canvas element (scaled by window.devicePixelRatio)
+      // Set this to false if you want to decouple this synchronization from
+      // happening inside the engine, and you would instead like to size up
+      // the canvas DOM size and WebGL render target sizes yourself.
+      // config.matchWebGLToCanvasSize = false;
 
-<script>
-  // Particles
-  const container = document.getElementById('particles');
-  for (let i = 0; i < 25; i++) {
-    const p = document.createElement('div');
-    p.className = 'particle';
-    p.style.left = Math.random() * 100 + 'vw';
-    p.style.animationDuration = (6 + Math.random() * 10) + 's';
-    p.style.animationDelay = (Math.random() * 10) + 's';
-    p.style.width = p.style.height = (2 + Math.random() * 4) + 'px';
-    p.style.opacity = Math.random() * 0.7 + 0.3;
-    container.appendChild(p);
-  }
+      // If you would like all file writes inside Unity Application.persistentDataPath
+      // directory to automatically persist so that the contents are remembered when
+      // the user revisits the site the next time, uncomment the following line:
+      // config.autoSyncPersistentDataPath = true;
+      // This autosyncing is currently not the default behavior to avoid regressing
+      // existing user projects that might rely on the earlier manual
+      // JS_FileSystem_Sync() behavior, but in future Unity version, this will be
+      // expected to change.
 
-  // Live score animation
-  let home = 0, away = 0;
-  setInterval(() => {
-    if (Math.random() < 0.15) {
-      if (Math.random() < 0.5) home++; else away++;
-      document.getElementById('score').textContent = home + ' – ' + away;
-    }
-  }, 4000);
-</script>
-</body>
+      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        // Mobile device style: fill the whole browser client area with the game canvas:
+
+        var meta = document.createElement('meta');
+        meta.name = 'viewport';
+        meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
+        document.getElementsByTagName('head')[0].appendChild(meta);
+        document.querySelector("#unity-container").className = "unity-mobile";
+        canvas.className = "unity-mobile";
+
+        // To lower canvas resolution on mobile devices to gain some
+        // performance, uncomment the following line:
+        // config.devicePixelRatio = 1;
+
+
+      } else {
+        // Desktop style: Render the game canvas in a window that can be maximized to fullscreen:
+        canvas.style.width = "960px";
+        canvas.style.height = "600px";
+      }
+
+      document.querySelector("#unity-loading-bar").style.display = "block";
+
+      var script = document.createElement("script");
+      script.src = loaderUrl;
+      script.onload = () => {
+        createUnityInstance(canvas, config, (progress) => {
+          document.querySelector("#unity-progress-bar-full").style.width = 100 * progress + "%";
+              }).then((unityInstance) => {
+                document.querySelector("#unity-loading-bar").style.display = "none";
+                document.querySelector("#unity-fullscreen-button").onclick = () => {
+                  unityInstance.SetFullscreen(1);
+                };
+
+              }).catch((message) => {
+                alert(message);
+              });
+            };
+
+      document.body.appendChild(script);
+
+    </script>
+  </body>
 </html>
