@@ -144,7 +144,8 @@ namespace Football.Presentation
             switch (state)
             {
                 case MatchState.KickOff:
-                    ShowBanner("PRESS SPACE OR [A] TO KICK OFF", 999.0f);
+                    bool isHumanKickoff = Football.Engine.MatchEngine.Instance == null || Football.Engine.MatchEngine.Instance.CurrentKickoffTeam == 1;
+                    ShowBanner(isHumanKickoff ? "PRESS SPACE OR J TO KICK OFF" : "OPPONENT KICK OFF", 999.0f);
                     break;
                 case MatchState.InPlay:
                     if (matchBannerText != null && matchBannerText.text.Contains("KICK OFF"))

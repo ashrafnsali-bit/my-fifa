@@ -51,8 +51,8 @@ namespace Football.Tactics
         {
             if (runtimeState.isSentOff) return;
 
-            // 0. Hold tactical formation anchor during kickoff until ball is kicked into play
-            if (GameEvents.CurrentMatchState == MatchState.KickOff)
+            // 0. Hold tactical formation anchor during kickoff or goal scored
+            if (GameEvents.CurrentMatchState == MatchState.KickOff || GameEvents.CurrentMatchState == MatchState.GoalScored)
             {
                 currentAIState = AIState.HoldingAnchor;
                 locomotion.SetWorldMovementInput(Vector3.zero, false);
@@ -126,6 +126,13 @@ namespace Football.Tactics
 
         private void ExecuteGoalkeeperBehavior(FootballBall ball)
         {
+            if (GameEvents.CurrentMatchState == MatchState.KickOff || GameEvents.CurrentMatchState == MatchState.GoalScored)
+            {
+                currentAIState = AIState.HoldingAnchor;
+                locomotion.SetWorldMovementInput(Vector3.zero, false);
+                return;
+            }
+
             currentAIState = AIState.Goalkeeping;
 
             // A. If Goalkeeper is holding the ball in his hands:

@@ -207,7 +207,12 @@ namespace Football.PhysicsEngine
 
                 if (isPastGoalLine && isInsideGoalMouth)
                 {
-                    // Goal will be caught by Goal trigger
+                    // Direct Goal Detection: Award goal to attacker!
+                    // pos.z > 0 is Away Goal (Team 2 defends), so Team 1 scores!
+                    // pos.z < 0 is Home Goal (Team 1 defends), so Team 2 scores!
+                    int defendingTeam = (pos.z > 0) ? 2 : 1;
+                    int scoringTeam = (defendingTeam == 1) ? 2 : 1;
+                    GameEvents.TriggerGoalScored(scoringTeam, pos);
                     return;
                 }
 

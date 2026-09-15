@@ -84,19 +84,77 @@ namespace Football.Engine
             GameEvents.TriggerMatchStateChanged(newState);
         }
 
+        public int CurrentKickoffTeam { get; private set; } = 1;
+
+        public void ResetAllPlayersToKickoffFormation(int kickingTeamId)
+        {
+            var players = FindObjectsByType<PlayerRuntimeState>(FindObjectsSortMode.None);
+            Vector3 center = centerSpot != null ? centerSpot.position : Vector3.zero;
+
+            foreach (var p in players)
+            {
+                if (p == null || p.isSentOff) continue;
+
+                var loc = p.GetComponent<FootballPlayerLocomotion>();
+                if (loc != null)
+                {
+                    loc.ResetPosition();
+                }
+
+                Vector3 pos = p.transform.position;
+
+                // Soccer Rule: At kickoff, EVERY player must be in their own half of the pitch!
+                // Team 1 defends -Z (own half is Z <= 0). Clamped to Z <= -1.5m
+                // Team 2 defends +Z (own half is Z >= 0). Clamped to Z >= +1.5m
+                if (p.teamId == 1)
+                {
+                    if (pos.z > -1.5f) pos.z = -1.5f;
+
+                    // If Team 1 is defending (Team 2 kicking off), stay outside the center circle (9.15m)
+                    if (kickingTeamId == 2 && Vector3.Distance(new Vector3(pos.x, 0f, pos.z), center) < 9.5f)
+                    {
+                        pos.z = -9.5f;
+                    }
+                    p.transform.position = pos;
+                    p.transform.rotation = Quaternion.LookRotation(Vector3.forward, Vector3.up);
+                }
+                else if (p.teamId == 2)
+                {
+                    if (pos.z < 1.5f) pos.z = 1.5f;
+
+                    // If Team 2 is defending (Team 1 kicking off), stay outside the center circle (9.15m)
+                    if (kickingTeamId == 1 && Vector3.Distance(new Vector3(pos.x, 0f, pos.z), center) < 9.5f)
+                    {
+                        pos.z = 9.5f;
+                    }
+                    p.transform.position = pos;
+                    p.transform.rotation = Quaternion.LookRotation(Vector3.back, Vector3.up);
+                }
+            }
+        }
+
         public IEnumerator MatchKickoffRoutine(int kickingTeamId)
         {
+            CurrentKickoffTeam = kickingTeamId;
             ChangeState(MatchState.KickOff);
             isClockRunning = false;
 
-            // Reposition ball to center spot
+            // Reposition ball to center spot and cancel any lingering velocity
             Vector3 kickoffPos = centerSpot != null ? centerSpot.position : Vector3.zero;
             if (FootballBall.Instance != null)
             {
                 FootballBall.Instance.ResetPosition(kickoffPos + Vector3.up * 0.11f);
+                if (FootballBall.Instance.BallRigidbody != null)
+                {
+                    FootballBall.Instance.BallRigidbody.linearVelocity = Vector3.zero;
+                    FootballBall.Instance.BallRigidbody.angularVelocity = Vector3.zero;
+                }
             }
 
-            // Position at least 2 players for the kicking team (kickoff taker and partner)
+            // Reposition all 22 players strictly inside their own half
+            ResetAllPlayersToKickoffFormation(kickingTeamId);
+
+            // Select kickoff taker and partner for the kicking team
             var players = FindObjectsByType<PlayerRuntimeState>(FindObjectsSortMode.None);
             PlayerRuntimeState kickoffTaker = null;
             PlayerRuntimeState kickoffPartner = null;
@@ -129,11 +187,12 @@ namespace Football.Engine
                 Vector3 takerOffset = (kickingTeamId == 1) ? Vector3.back * 0.95f : Vector3.forward * 0.95f;
                 kickoffTaker.transform.position = kickoffPos + takerOffset;
                 kickoffTaker.transform.rotation = Quaternion.LookRotation(-takerOffset, Vector3.up);
+                kickoffTaker.hasBall = true;
             }
 
             if (kickoffPartner != null)
             {
-                Vector3 partnerOffset = (kickingTeamId == 1) ? (Vector3.back * 1.3f + Vector3.right * 1.9f) : (Vector3.forward * 1.3f + Vector3.left * 1.9f);
+                Vector3 partnerOffset = (kickingTeamId == 1) ? (Vector3.back * 1.3f + Vector3.right * 1.8f) : (Vector3.forward * 1.3f + Vector3.left * 1.8f);
                 kickoffPartner.transform.position = kickoffPos + partnerOffset;
                 Vector3 toBall = (kickoffPos - kickoffPartner.transform.position).normalized;
                 kickoffPartner.transform.rotation = Quaternion.LookRotation(toBall, Vector3.up);
@@ -185,21 +244,28 @@ namespace Football.Engine
 
             if (kickingTeamId == 2)
             {
-                // AI opponent kickoff: wait briefly then pass backwards
-                yield return new WaitForSeconds(1.6f);
+                // AI opponent kickoff: wait briefly, then pass to partner or teammate
+                yield return new WaitForSeconds(1.5f);
                 if (FootballBall.Instance != null)
                 {
-                    Vector3 passDir = (PitchConstants.GetDefendingGoalCenter(2) - kickoffPos).normalized;
+                    Vector3 passTarget = kickoffPartner != null ? kickoffPartner.transform.position : (kickoffPos + Vector3.forward * 4.0f);
+                    Vector3 passDir = (passTarget - kickoffPos).normalized;
                     passDir.y = 0f;
-                    FootballBall.Instance.Kick(passDir * 5.5f, Vector3.zero, 9, 2);
+                    FootballBall.Instance.Kick(passDir * 5.2f, Vector3.zero, kickoffTaker != null ? kickoffTaker.jerseyNumber : 9, 2);
                 }
             }
             else
             {
-                // Human team kickoff: wait for user order / input, or auto-start after 2.5 seconds
+                // Human team kickoff: automatically switch active human control to kickoff taker
+                if (TeamPlayerSwitcher.Instance != null && kickoffTaker != null)
+                {
+                    TeamPlayerSwitcher.Instance.SwitchToPlayer(kickoffTaker);
+                }
+
+                // Wait for user order / input, or auto-start after 4.0 seconds
                 float waitTimer = 0f;
                 bool userTriggered = false;
-                while (!userTriggered && waitTimer < 2.5f)
+                while (!userTriggered && waitTimer < 4.0f)
                 {
                     waitTimer += Time.deltaTime;
                     var keyboard = Keyboard.current;
@@ -208,6 +274,7 @@ namespace Football.Engine
                     if (keyboard != null)
                     {
                         if (keyboard.spaceKey.wasPressedThisFrame || keyboard.enterKey.wasPressedThisFrame ||
+                            keyboard.jKey.wasPressedThisFrame || keyboard.kKey.wasPressedThisFrame || keyboard.lKey.wasPressedThisFrame ||
                             keyboard.wKey.wasPressedThisFrame || keyboard.sKey.wasPressedThisFrame ||
                             keyboard.aKey.wasPressedThisFrame || keyboard.dKey.wasPressedThisFrame ||
                             keyboard.upArrowKey.wasPressedThisFrame || keyboard.downArrowKey.wasPressedThisFrame ||
@@ -237,7 +304,10 @@ namespace Football.Engine
 
                 if (FootballBall.Instance != null && FootballBall.Instance.Velocity.magnitude < 0.2f)
                 {
-                    FootballBall.Instance.Kick(Vector3.forward * 5.0f, Vector3.zero, 10, 1);
+                    Vector3 passTarget = kickoffPartner != null ? kickoffPartner.transform.position : (kickoffPos + Vector3.forward * 4.0f);
+                    Vector3 passDir = (passTarget - kickoffPos).normalized;
+                    passDir.y = 0f;
+                    FootballBall.Instance.Kick(passDir * 5.2f, Vector3.zero, kickoffTaker != null ? kickoffTaker.jerseyNumber : 10, 1);
                 }
             }
 
@@ -273,28 +343,24 @@ namespace Football.Engine
 
             GameEvents.TriggerScoreUpdated(homeScore, awayScore);
 
-            // Settle ball inside the net
+            // Settle ball completely inside the net
             if (FootballBall.Instance != null && FootballBall.Instance.BallRigidbody != null)
             {
-                FootballBall.Instance.BallRigidbody.linearVelocity = FootballBall.Instance.BallRigidbody.linearVelocity * 0.2f;
+                FootballBall.Instance.BallRigidbody.linearVelocity = Vector3.zero;
                 FootballBall.Instance.BallRigidbody.angularVelocity = Vector3.zero;
             }
 
-            // Restart match from kickoff (conceding team kicks off)
+            // CRITICAL RULE: When one team scores, the CONCEDING (other) team restarts from center of the pitch!
+            // Team 1 scored -> Team 2 restarts from center
+            // Team 2 scored -> Team 1 restarts from center
             int nextKickoffTeam = (scoringTeamId == 1) ? 2 : 1;
+            CurrentKickoffTeam = nextKickoffTeam;
             StartCoroutine(DelayedKickoffAfterGoal(nextKickoffTeam));
         }
 
         private IEnumerator DelayedKickoffAfterGoal(int nextKickoffTeam)
         {
-            yield return new WaitForSeconds(3.5f);
-
-            // Reset all players to formation anchors
-            var players = FindObjectsByType<FootballPlayerLocomotion>(FindObjectsSortMode.None);
-            foreach (var p in players)
-            {
-                p.ResetPosition();
-            }
+            yield return new WaitForSeconds(3.0f);
 
             StartCoroutine(MatchKickoffRoutine(nextKickoffTeam));
         }
