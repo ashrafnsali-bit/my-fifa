@@ -193,6 +193,24 @@ namespace Football.Locomotion
             var ball = FootballBall.Instance;
             if (ball == null) return;
 
+            // IRONCLAD: Only interact with ball if the match is actively in play!
+            // When a goal is scored or during kickoff, no player or goalkeeper can catch, dribble, or claim the ball!
+            if (GameEvents.CurrentMatchState != MatchState.InPlay)
+            {
+                runtimeState.hasBall = false;
+                runtimeState.isHoldingBallInHands = false;
+                return;
+            }
+
+            // IRONCLAD: If the ball has crossed the goal line (inside net or out of bounds),
+            // neither goalkeepers nor outfield players can reach inside the net to take it!
+            if (Mathf.Abs(ball.transform.position.z) >= PitchConstants.HalfLength - 0.15f)
+            {
+                runtimeState.hasBall = false;
+                runtimeState.isHoldingBallInHands = false;
+                return;
+            }
+
             // Tick down the GK re-catch cooldown every frame
             if (gkReleaseCooldown > 0f)
                 gkReleaseCooldown -= dt;
@@ -352,6 +370,8 @@ namespace Football.Locomotion
         public void CatchBallInHands(FootballBall ball)
         {
             if (runtimeState.attributes == null || runtimeState.attributes.position != PlayerPosition.GK) return;
+            if (GameEvents.CurrentMatchState != MatchState.InPlay) return;
+            if (Mathf.Abs(ball.transform.position.z) >= PitchConstants.HalfLength - 0.15f) return;
 
             runtimeState.hasBall = true;
             runtimeState.isHoldingBallInHands = true;
@@ -371,6 +391,8 @@ namespace Football.Locomotion
         public void ExecuteGoalkeeperBlockSave(FootballBall ball)
         {
             if (runtimeState.attributes == null || runtimeState.attributes.position != PlayerPosition.GK) return;
+            if (GameEvents.CurrentMatchState != MatchState.InPlay) return;
+            if (Mathf.Abs(ball.transform.position.z) >= PitchConstants.HalfLength - 0.15f) return;
 
             bool diveRight = (ball.transform.position.x > transform.position.x);
             bool highSave = (ball.transform.position.y > 1.2f);

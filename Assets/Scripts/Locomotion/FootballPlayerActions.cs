@@ -78,6 +78,8 @@ namespace Football.Locomotion
 
         public void StartShotCharge()
         {
+            if (GameEvents.CurrentMatchState != MatchState.InPlay) return;
+
             var ball = FootballBall.Instance;
             Vector3 toBall = ball != null ? (ball.transform.position - transform.position) : Vector3.zero;
             toBall.y = 0;
@@ -99,6 +101,8 @@ namespace Football.Locomotion
 
         public void ExecuteShot(ShotType type, Vector3 aimDirection, float power01)
         {
+            if (GameEvents.CurrentMatchState != MatchState.InPlay) return;
+
             var ball = FootballBall.Instance;
             if (ball == null) return;
 
@@ -196,6 +200,8 @@ namespace Football.Locomotion
 
         public void StartPassCharge()
         {
+            if (GameEvents.CurrentMatchState != MatchState.InPlay) return;
+
             var ball = FootballBall.Instance;
             float dist = ball != null ? Vector3.Distance(transform.position, ball.transform.position) : 99f;
             if (!runtimeState.hasBall && dist > 3.0f) return;
@@ -217,6 +223,8 @@ namespace Football.Locomotion
 
         public void ExecutePass(PassType type, Vector3 aimDirection, float power01, Transform targetTeammate = null)
         {
+            if (GameEvents.CurrentMatchState != MatchState.InPlay) return;
+
             var ball = FootballBall.Instance;
             if (ball == null) return;
 
@@ -447,6 +455,7 @@ namespace Football.Locomotion
 
         public void ExecuteStandingTackle()
         {
+            if (GameEvents.CurrentMatchState != MatchState.InPlay) return;
             if (isSlideTackling || runtimeState.hasBall) return;
 
             // Cannot tackle if any goalkeeper is holding ball with hands (foul / illegal)
@@ -478,6 +487,7 @@ namespace Football.Locomotion
 
         public void ExecuteSlideTackle()
         {
+            if (GameEvents.CurrentMatchState != MatchState.InPlay) return;
             if (isSlideTackling || runtimeState.hasBall) return;
 
             // Cannot slide tackle if any goalkeeper is holding ball with hands (foul / illegal)

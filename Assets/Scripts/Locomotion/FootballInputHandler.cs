@@ -25,7 +25,7 @@ namespace Football.Locomotion
         {
             if (!isHumanControlled || runtimeState.isSentOff) return;
 
-            if (GameEvents.CurrentMatchState == MatchState.GoalScored)
+            if (GameEvents.CurrentMatchState == MatchState.GoalScored || GameEvents.CurrentMatchState == MatchState.KickOff)
             {
                 locomotion.SetMovementInput(Vector2.zero, false);
                 return;

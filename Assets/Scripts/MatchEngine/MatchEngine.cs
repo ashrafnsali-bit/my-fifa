@@ -95,6 +95,9 @@ namespace Football.Engine
             {
                 if (p == null || p.isSentOff) continue;
 
+                p.hasBall = false;
+                p.isHoldingBallInHands = false;
+
                 var loc = p.GetComponent<FootballPlayerLocomotion>();
                 if (loc != null)
                 {
@@ -139,16 +142,17 @@ namespace Football.Engine
             ChangeState(MatchState.KickOff);
             isClockRunning = false;
 
-            // Reposition ball to center spot and cancel any lingering velocity
+            // Reposition ball to center spot, unfreeze kinematics and cancel any lingering velocity
             Vector3 kickoffPos = centerSpot != null ? centerSpot.position : Vector3.zero;
             if (FootballBall.Instance != null)
             {
-                FootballBall.Instance.ResetPosition(kickoffPos + Vector3.up * 0.11f);
                 if (FootballBall.Instance.BallRigidbody != null)
                 {
+                    FootballBall.Instance.BallRigidbody.isKinematic = false;
                     FootballBall.Instance.BallRigidbody.linearVelocity = Vector3.zero;
                     FootballBall.Instance.BallRigidbody.angularVelocity = Vector3.zero;
                 }
+                FootballBall.Instance.ResetPosition(kickoffPos + Vector3.up * 0.11f);
             }
 
             // Reposition all 22 players strictly inside their own half
@@ -265,10 +269,13 @@ namespace Football.Engine
                     GameEvents.TriggerRequestPlayerSwitch(kickoffTaker.transform);
                 }
 
-                // Wait for user order / input, or auto-start after 4.0 seconds
+                // Mandatory 1.0 second pause so players are formed, camera aligns, and any lingering keystrokes don't skip
+                yield return new WaitForSeconds(1.0f);
+
+                // Wait for user order / input, or auto-start after 3.0 seconds
                 float waitTimer = 0f;
                 bool userTriggered = false;
-                while (!userTriggered && waitTimer < 4.0f)
+                while (!userTriggered && waitTimer < 3.0f)
                 {
                     waitTimer += Time.deltaTime;
                     var keyboard = Keyboard.current;
@@ -287,7 +294,7 @@ namespace Football.Engine
                         }
                     }
 
-                    if (Input.anyKeyDown || Mathf.Abs(Input.GetAxis("Horizontal")) > 0.1f || Mathf.Abs(Input.GetAxis("Vertical")) > 0.1f)
+                    if (Input.anyKeyDown)
                     {
                         userTriggered = true;
                     }
@@ -346,11 +353,29 @@ namespace Football.Engine
 
             GameEvents.TriggerScoreUpdated(homeScore, awayScore);
 
-            // Settle ball completely inside the net
+            // Settle and lock ball completely inside the net
             if (FootballBall.Instance != null && FootballBall.Instance.BallRigidbody != null)
             {
                 FootballBall.Instance.BallRigidbody.linearVelocity = Vector3.zero;
                 FootballBall.Instance.BallRigidbody.angularVelocity = Vector3.zero;
+                FootballBall.Instance.BallRigidbody.isKinematic = true;
+            }
+
+            // Immediately clear ball possession and movement on all players across the pitch
+            var allPlayers = FindObjectsByType<PlayerRuntimeState>(FindObjectsSortMode.None);
+            foreach (var p in allPlayers)
+            {
+                if (p != null)
+                {
+                    p.hasBall = false;
+                    p.isHoldingBallInHands = false;
+                    var loc = p.GetComponent<FootballPlayerLocomotion>();
+                    if (loc != null)
+                    {
+                        loc.OnBallKicked(0.5f);
+                        loc.SetWorldMovementInput(Vector3.zero, false);
+                    }
+                }
             }
 
             // CRITICAL RULE: When one team scores, the CONCEDING (other) team restarts from center of the pitch!
@@ -363,7 +388,7 @@ namespace Football.Engine
 
         private IEnumerator DelayedKickoffAfterGoal(int nextKickoffTeam)
         {
-            yield return new WaitForSeconds(3.0f);
+            yield return new WaitForSeconds(2.5f);
 
             StartCoroutine(MatchKickoffRoutine(nextKickoffTeam));
         }

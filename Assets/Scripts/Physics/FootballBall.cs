@@ -112,6 +112,9 @@ namespace Football.PhysicsEngine
 
         public void Kick(Vector3 velocity, Vector3 spinAngularVelocity, int kickingPlayerId, int teamId)
         {
+            if (rb == null) return;
+            if (rb.isKinematic) rb.isKinematic = false;
+
             lastKickingPlayerId = kickingPlayerId;
             lastTeamPossession = teamId;
 
