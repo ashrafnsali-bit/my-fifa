@@ -55,12 +55,13 @@
       }
 
       var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/folder.loader.js?v=3";
+      var cacheBust = "?v=" + Date.now();
+      var loaderUrl = buildUrl + "/folder.loader.js" + cacheBust;
       var config = {
         arguments: [],
-        dataUrl: buildUrl + "/folder.data",
-        frameworkUrl: buildUrl + "/folder.framework.js",
-        codeUrl: buildUrl + "/folder.wasm",
+        dataUrl: buildUrl + "/folder.data" + cacheBust,
+        frameworkUrl: buildUrl + "/folder.framework.js" + cacheBust,
+        codeUrl: buildUrl + "/folder.wasm" + cacheBust,
         streamingAssetsUrl: "StreamingAssets",
         companyName: "DefaultCompany",
         productName: "fifa26",
