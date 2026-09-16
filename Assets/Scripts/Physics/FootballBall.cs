@@ -210,10 +210,10 @@ namespace Football.PhysicsEngine
 
                 if (isPastGoalLine && isInsideGoalMouth)
                 {
-                    // Direct Goal Detection: Award goal to attacker!
-                    // pos.z > 0 is Away Goal (Team 2 defends), so Team 1 scores!
-                    // pos.z < 0 is Home Goal (Team 1 defends), so Team 2 scores!
-                    int defendingTeam = (pos.z > 0) ? 2 : 1;
+                    // pos.z > 0 is Away Goal, pos.z < 0 is Home Goal
+                    int defendingTeam = (pos.z > 0) 
+                        ? (PitchConstants.Team1DefendsNegativeZ ? 2 : 1) 
+                        : (PitchConstants.Team1DefendsNegativeZ ? 1 : 2);
                     int scoringTeam = (defendingTeam == 1) ? 2 : 1;
                     GameEvents.TriggerGoalScored(scoringTeam, pos);
                     return;
@@ -232,18 +232,21 @@ namespace Football.PhysicsEngine
                 // If outside endline (Z boundaries)
                 else if (Mathf.Abs(pos.z) > PitchConstants.HalfLength)
                 {
-                    bool touchedByAttacker = (pos.z > 0 && lastTeamPossession == 1) || (pos.z < 0 && lastTeamPossession == 2);
+                    int endlineDefendingTeam = (pos.z > 0) 
+                        ? (PitchConstants.Team1DefendsNegativeZ ? 2 : 1) 
+                        : (PitchConstants.Team1DefendsNegativeZ ? 1 : 2);
+                    bool touchedByAttacker = (lastTeamPossession != endlineDefendingTeam);
+
                     if (touchedByAttacker)
                     {
                         // Goal Kick to defending team
-                        int defendingTeam = (pos.z > 0) ? 2 : 1;
                         Vector3 goalKickPos = new Vector3(0f, 0.1f, (pos.z > 0 ? PitchConstants.HalfLength - 5.5f : -PitchConstants.HalfLength + 5.5f));
-                        GameEvents.TriggerSetPieceInitiated(MatchState.GoalKick, goalKickPos, defendingTeam);
+                        GameEvents.TriggerSetPieceInitiated(MatchState.GoalKick, goalKickPos, endlineDefendingTeam);
                     }
                     else
                     {
                         // Corner Kick to attacking team
-                        int attackingTeam = (pos.z > 0) ? 1 : 2;
+                        int attackingTeam = (endlineDefendingTeam == 1) ? 2 : 1;
                         bool homeEnd = pos.z < 0;
                         bool leftSide = pos.x < 0;
                         Vector3 cornerPos = PitchConstants.GetCornerPosition(homeEnd, leftSide);

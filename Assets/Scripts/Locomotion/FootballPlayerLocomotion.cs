@@ -9,16 +9,16 @@ namespace Football.Locomotion
     public class FootballPlayerLocomotion : MonoBehaviour
     {
         [Header("Locomotion Tuning")]
-        public float baseJogSpeed = 5.2f;
-        public float baseSprintSpeed = 8.8f;
-        public float accelerationRate = 18.0f;
-        public float decelerationRate = 22.0f;
-        public float turnSpeed = 720.0f;
+        public float baseJogSpeed = 5.4f;
+        public float baseSprintSpeed = 9.2f;
+        public float accelerationRate = 24.0f;
+        public float decelerationRate = 30.0f;
+        public float turnSpeed = 920.0f;
 
         [Header("Dribble Magnet")]
-        public float dribbleRadius = 1.65f;
-        public float dribblePushOffset = 0.65f;
-        public float dribbleTouchForce = 5.5f;
+        public float dribbleRadius = 1.85f;
+        public float dribblePushOffset = 0.70f;
+        public float dribbleTouchForce = 6.0f;
 
         [Header("Goalkeeper Hold Limit")]
         public const float MaxGoalkeeperHoldTime = 2.0f; // Strictly under 3 seconds!
@@ -117,41 +117,74 @@ namespace Football.Locomotion
         {
             if (blobShadow != null)
             {
-                // Strictly match Player Transform on X and Z with 0 offset.
-                // Keep Y fixed at ground level.
                 blobShadow.position = new Vector3(transform.position.x, groundY, transform.position.z);
             }
         }
 
         private void UpdateLocomotion(float dt)
         {
-            // During KickOff, hold position strictly at spawn spot while allowing rotation aiming
-            if (GameEvents.CurrentMatchState == MatchState.KickOff)
+            if (GameEvents.CurrentMatchState == MatchState.HalfTime || GameEvents.CurrentMatchState == MatchState.FullTime)
             {
                 currentVelocity = Vector3.zero;
-                if (targetMoveDirection.sqrMagnitude > 0.01f)
+                if (rb != null)
                 {
-                    Quaternion targetRot = Quaternion.LookRotation(targetMoveDirection, Vector3.up);
-                    rb.MoveRotation(Quaternion.RotateTowards(rb.rotation, targetRot, turnSpeed * dt));
+                    rb.linearVelocity = Vector3.zero;
+                    rb.angularVelocity = Vector3.zero;
                 }
                 return;
             }
 
-            // Compute attribute-influenced speeds
+            bool isRestartState = (GameEvents.CurrentMatchState == MatchState.KickOff ||
+                                   GameEvents.CurrentMatchState == MatchState.ThrowIn ||
+                                   GameEvents.CurrentMatchState == MatchState.CornerKick ||
+                                   GameEvents.CurrentMatchState == MatchState.GoalKick ||
+                                   GameEvents.CurrentMatchState == MatchState.FreeKick ||
+                                   GameEvents.CurrentMatchState == MatchState.PenaltyKick);
+
+            // During restart states: if human player starts moving with WASD/stick, start dribbling into active play!
+            if (isRestartState)
+            {
+                var input = GetComponent<FootballInputHandler>();
+                if (input != null && input.isHumanControlled && targetMoveDirection.sqrMagnitude > 0.05f)
+                {
+                    GameEvents.TriggerMatchStateChanged(MatchState.InPlay);
+                }
+                else
+                {
+                    currentVelocity = Vector3.zero;
+                    if (targetMoveDirection.sqrMagnitude > 0.01f)
+                    {
+                        Quaternion targetRot = Quaternion.LookRotation(targetMoveDirection, Vector3.up);
+                        rb.MoveRotation(Quaternion.RotateTowards(rb.rotation, targetRot, turnSpeed * dt));
+                    }
+                    return;
+                }
+            }
+
+            // Compute attribute-influenced speeds & agility
             float sprintAttr = runtimeState.attributes != null ? runtimeState.attributes.sprintSpeed : 75f;
             float accelAttr = runtimeState.attributes != null ? runtimeState.attributes.acceleration : 75f;
+            float agilityAttr = runtimeState.attributes != null ? runtimeState.attributes.agility : 75f;
             float speedMult = runtimeState.SpeedMultiplier;
 
             float maxSpeed = isSprinting
-                ? Mathf.Lerp(7.0f, baseSprintSpeed + 1.5f, sprintAttr / 100f) * speedMult
-                : baseJogSpeed * speedMult;
+                ? Mathf.Lerp(7.5f, baseSprintSpeed + 1.8f, sprintAttr / 100f) * speedMult
+                : baseJogSpeed * (1f + (sprintAttr - 70f) * 0.004f) * speedMult;
 
             Vector3 targetVel = targetMoveDirection * maxSpeed;
 
-            // Smooth acceleration / deceleration with explosive agility boost for goalkeepers
+            // First-step explosive acceleration burst
+            bool isStandingStart = currentVelocity.sqrMagnitude < 1.0f && targetMoveDirection.sqrMagnitude > 0.1f;
+            float firstStepMultiplier = isStandingStart ? 1.45f : 1.0f;
+
+            // Goalkeeper explosive reflex multiplier
             bool isGK = runtimeState.attributes != null && runtimeState.attributes.position == PlayerPosition.GK;
-            float gkAccelMult = isGK ? 2.8f : 1.0f;
-            float currentAccel = targetMoveDirection.sqrMagnitude > 0.01f ? accelerationRate * (accelAttr / 70f) * gkAccelMult : decelerationRate;
+            float gkAccelMult = isGK ? 3.0f : 1.0f;
+
+            float currentAccel = targetMoveDirection.sqrMagnitude > 0.01f 
+                ? accelerationRate * (accelAttr / 70f) * gkAccelMult * firstStepMultiplier 
+                : decelerationRate * (agilityAttr / 70f);
+
             currentVelocity = Vector3.MoveTowards(currentVelocity, targetVel, currentAccel * dt);
 
             // Move rigidbody strictly on ground plane
@@ -161,7 +194,8 @@ namespace Football.Locomotion
             nextPos.y = 0.0f;
             rb.MovePosition(nextPos);
 
-            // Rotation towards movement or ball if goalkeeper
+            // Dynamic rotation with agility scaling
+            float dynamicTurnSpeed = turnSpeed * (agilityAttr / 70f);
             var ballObj = FootballBall.Instance;
 
             // Goalkeepers lock facing onto ball for instant saving stance (or face pitch when ball is in net / kickoff)
@@ -183,13 +217,13 @@ namespace Football.Locomotion
                 if (faceDir.sqrMagnitude > 0.05f)
                 {
                     Quaternion faceRot = Quaternion.LookRotation(faceDir.normalized, Vector3.up);
-                    rb.MoveRotation(Quaternion.RotateTowards(rb.rotation, faceRot, turnSpeed * 1.5f * dt));
+                    rb.MoveRotation(Quaternion.RotateTowards(rb.rotation, faceRot, dynamicTurnSpeed * 1.5f * dt));
                 }
             }
             else if (targetMoveDirection.sqrMagnitude > 0.01f)
             {
                 Quaternion targetRot = Quaternion.LookRotation(targetMoveDirection, Vector3.up);
-                rb.MoveRotation(Quaternion.RotateTowards(rb.rotation, targetRot, turnSpeed * dt));
+                rb.MoveRotation(Quaternion.RotateTowards(rb.rotation, targetRot, dynamicTurnSpeed * dt));
             }
 
             // Stamina update
@@ -238,9 +272,10 @@ namespace Football.Locomotion
             var ball = FootballBall.Instance;
             if (ball == null) return;
 
-            // IRONCLAD: Only interact with ball if the match is actively in play!
-            // When a goal is scored or during kickoff, no player or goalkeeper can catch, dribble, or claim the ball!
-            if (GameEvents.CurrentMatchState != MatchState.InPlay)
+            // Clear ball possession only during goals or halftime/fulltime breaks
+            if (GameEvents.CurrentMatchState == MatchState.GoalScored || 
+                GameEvents.CurrentMatchState == MatchState.HalfTime || 
+                GameEvents.CurrentMatchState == MatchState.FullTime)
             {
                 runtimeState.hasBall = false;
                 runtimeState.isHoldingBallInHands = false;

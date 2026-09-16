@@ -345,8 +345,13 @@ namespace Football.Locomotion
 
             if (isMoving)
             {
-                float freq = isSprinting ? sprintFrequency : jogFrequency;
-                if (hasBall) freq *= 1.15f; // Rapid-touch cadence while dribbling
+                // Dynamic speed-synchronized cadence (eliminates foot slide completely)
+                float maxExpectedSpeed = isSprinting ? 9.2f : 5.4f;
+                float speedNorm = Mathf.Clamp01(horizontalSpeed / maxExpectedSpeed);
+                float naturalStrideLen = isSprinting ? 1.75f : 1.35f;
+                float dynamicFreq = (horizontalSpeed / naturalStrideLen) * (2f * Mathf.PI);
+                float freq = Mathf.Clamp(dynamicFreq, 4.5f, 16.5f);
+                if (hasBall) freq *= 1.12f; // Quick-touch cadence while dribbling
 
                 stridePhase += dt * freq;
 
@@ -357,9 +362,10 @@ namespace Football.Locomotion
                 float sinL = Mathf.Sin(phaseL);
                 float sinR = Mathf.Sin(phaseR);
 
-                // 1. Hip Swing (Thigh Pitch & Pelvic Roll)
-                float swingAmp = isSprinting ? maxLegSwingAngle : maxLegSwingAngle * 0.78f;
-                if (hasBall) swingAmp *= 0.85f; // Compact, agile strides while dribbling
+                // 1. Hip Swing (Thigh Pitch & Pelvic Roll) - dynamic amplitude scaling
+                float baseSwingAmp = isSprinting ? maxLegSwingAngle : maxLegSwingAngle * 0.78f;
+                float swingAmp = Mathf.Lerp(maxLegSwingAngle * 0.45f, baseSwingAmp, Mathf.Max(0.2f, speedNorm));
+                if (hasBall) swingAmp *= 0.88f; // Compact, agile strides while dribbling
 
                 float hipPitchL = sinL * swingAmp;
                 float hipPitchR = sinR * swingAmp;
@@ -415,7 +421,8 @@ namespace Football.Locomotion
                 if (rightAnkle != null) rightAnkle.localRotation = initialRightAnkleRot * Quaternion.Euler(ankleR, dribbleYawR, 0f);
 
                 // 4. Arm swing in opposition to legs with slight outward flare
-                float armAngle = -sinL * (isSprinting ? maxArmSwingAngle : maxArmSwingAngle * 0.65f);
+                float armSwingAmp = Mathf.Lerp(maxArmSwingAngle * 0.4f, isSprinting ? maxArmSwingAngle : maxArmSwingAngle * 0.65f, Mathf.Max(0.2f, speedNorm));
+                float armAngle = -sinL * armSwingAmp;
                 float armFlare = hasBall ? 16.0f : 8.0f; // Wider arm shielding when dribbling
 
                 if (isGK && !isSprinting)
@@ -431,11 +438,11 @@ namespace Football.Locomotion
 
                 // 5. Torso: vertical bounce, sprint forward pitch, centrifugal banking, spinal counter-twist, and lateral weight sway
                 float shoulderTwist = -sinL * (isSprinting ? 7.5f : 4.0f);
-                float lateralSway = -sinL * (isSprinting ? 0.038f : 0.024f); // Authentic human physical weight transfer
+                float lateralSway = -sinL * (isSprinting ? 0.038f : 0.024f) * Mathf.Max(0.3f, speedNorm); // Authentic physical weight transfer
                 if (torso != null)
                 {
-                    float bounce = Mathf.Abs(sinL) * torsoBounceHeight;
-                    float heightDrop = (hasBall ? -0.032f : 0f) + (isGK ? -0.055f : 0f);
+                    float bounce = Mathf.Abs(sinL) * torsoBounceHeight * Mathf.Max(0.3f, speedNorm);
+                    float heightDrop = (hasBall ? -0.032f : 0f) + (isGK ? -0.055f : 0f) - Mathf.Abs(currentBankAngle) * 0.003f; // Drop hips into sharp turns
                     torso.localPosition = initialTorsoLocalPos + new Vector3(lateralSway, bounce + heightDrop, 0f);
                     torso.localRotation = initialTorsoLocalRot * Quaternion.Euler(currentPitchAngle, shoulderTwist, currentBankAngle);
                 }

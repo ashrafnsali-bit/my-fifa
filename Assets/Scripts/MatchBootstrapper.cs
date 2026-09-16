@@ -1262,7 +1262,7 @@ public class MatchBootstrapper : MonoBehaviour
         var engine = systemsRoot.AddComponent<MatchEngine>();
         engine.homeTeamName = "Argentina";
         engine.awayTeamName = "France";
-        engine.halfDurationSeconds = 180f; // 3 mins real time per half
+        engine.halfDurationSeconds = 60f; // 1 minute real time per half (60 seconds)
 
         // 2. Referee System
         systemsRoot.AddComponent<RefereeSystem>();

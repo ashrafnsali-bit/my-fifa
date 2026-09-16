@@ -81,11 +81,11 @@ namespace Football.Procedural
             float pW = PitchConstants.HalfWidth;
             float pL = PitchConstants.HalfLength;
 
-            // Lateral Sideline Grandstands (East & West) - Set at authentic spacious FIFA World Cup distance
+            // Lateral Sideline Grandstands (East - TV Backdrop across the pitch)
+            // Note: West grandstand (near-side) is omitted so the broadcast camera has an unobstructed 100% clean view of the pitch!
             BuildStandSection(standsRoot.transform, "Stand_East", new Vector3(pW + 26.0f, 11.5f, 0f), new Vector3(26f, 24f, PitchConstants.PitchLength + 16f), -22f, crowdTier1Mat, crowdTier2Mat, concreteMat, bannerMat, vipGlassMat, argFlagMat, fraFlagMat, phaseOffset: 0.0f);
-            BuildStandSection(standsRoot.transform, "Stand_West", new Vector3(-pW - 28.0f, 11.5f, 0f), new Vector3(26f, 24f, PitchConstants.PitchLength + 16f), 22f, crowdTier1Mat, crowdTier2Mat, concreteMat, bannerMat, vipGlassMat, argFlagMat, fraFlagMat, phaseOffset: 1.5f);
 
-            // Endline Behind-the-Goal Stands (North & South) - Positioned behind goals without overflowing into sideline camera corridor
+            // Endline Behind-the-Goal Stands (North & South) - Positioned behind goals
             BuildStandSection(standsRoot.transform, "Stand_South", new Vector3(0f, 11.5f, -pL - 28.0f), new Vector3(PitchConstants.PitchWidth + 14f, 24f, 26f), 0f, crowdTier1Mat, crowdTier2Mat, concreteMat, bannerMat, vipGlassMat, argFlagMat, fraFlagMat, isEndline: true, facingAngle: 22f, phaseOffset: 0.7f);
             BuildStandSection(standsRoot.transform, "Stand_North", new Vector3(0f, 11.5f, pL + 28.0f), new Vector3(PitchConstants.PitchWidth + 14f, 24f, 26f), 0f, crowdTier1Mat, crowdTier2Mat, concreteMat, bannerMat, vipGlassMat, argFlagMat, fraFlagMat, isEndline: true, facingAngle: -22f, phaseOffset: 2.2f);
         }
@@ -351,8 +351,7 @@ namespace Football.Procedural
             float roofThickness = 1.0f;
             float roofDepth = 26.0f;
 
-            // East/West Overhangs
-            CreateRoofPanel(roofObj.transform, new Vector3(-pW, 0f, 0f), new Vector3(roofDepth, roofThickness, PitchConstants.PitchLength + 16f), 12f, canopyMat);
+            // East Overhang (across the pitch)
             CreateRoofPanel(roofObj.transform, new Vector3(pW, 0f, 0f), new Vector3(roofDepth, roofThickness, PitchConstants.PitchLength + 16f), -12f, canopyMat);
 
             // North/South Overhangs

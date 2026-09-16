@@ -38,15 +38,19 @@ namespace Football.Locomotion
             var gamepad = Gamepad.current;
 
             // 1. Unified robust input reading (New Input System + Legacy Input fallback)
-            bool spaceDown = (keyboard != null && keyboard.spaceKey.wasPressedThisFrame) || Input.GetKeyDown(KeyCode.Space);
-            bool spaceHeld = (keyboard != null && keyboard.spaceKey.isPressed) || Input.GetKey(KeyCode.Space);
-            bool spaceUp = (keyboard != null && keyboard.spaceKey.wasReleasedThisFrame) || Input.GetKeyUp(KeyCode.Space);
+            var mouse = Mouse.current;
+            bool enterDown = (keyboard != null && (keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame)) || Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter);
+            bool mouseDown = (mouse != null && mouse.leftButton.wasPressedThisFrame) || Input.GetMouseButtonDown(0);
+
+            bool spaceDown = (keyboard != null && keyboard.spaceKey.wasPressedThisFrame) || Input.GetKeyDown(KeyCode.Space) || enterDown || mouseDown;
+            bool spaceHeld = (keyboard != null && keyboard.spaceKey.isPressed) || Input.GetKey(KeyCode.Space) || Input.GetKey(KeyCode.Return);
+            bool spaceUp = (keyboard != null && keyboard.spaceKey.wasReleasedThisFrame) || Input.GetKeyUp(KeyCode.Space) || Input.GetKeyUp(KeyCode.Return) || Input.GetMouseButtonUp(0);
 
             bool lDown = (keyboard != null && keyboard.lKey.wasPressedThisFrame) || Input.GetKeyDown(KeyCode.L) || (gamepad != null && gamepad.buttonEast.wasPressedThisFrame);
             bool lHeld = (keyboard != null && keyboard.lKey.isPressed) || Input.GetKey(KeyCode.L) || (gamepad != null && gamepad.buttonEast.isPressed);
             bool lUp = (keyboard != null && keyboard.lKey.wasReleasedThisFrame) || Input.GetKeyUp(KeyCode.L) || (gamepad != null && gamepad.buttonEast.wasReleasedThisFrame);
 
-            bool jDown = (keyboard != null && keyboard.jKey.wasPressedThisFrame) || Input.GetKeyDown(KeyCode.J) || (gamepad != null && gamepad.buttonSouth.wasPressedThisFrame);
+            bool jDown = (keyboard != null && keyboard.jKey.wasPressedThisFrame) || Input.GetKeyDown(KeyCode.J) || (gamepad != null && gamepad.buttonSouth.wasPressedThisFrame) || enterDown || mouseDown;
             bool jUp = (keyboard != null && keyboard.jKey.wasReleasedThisFrame) || Input.GetKeyUp(KeyCode.J) || (gamepad != null && gamepad.buttonSouth.wasReleasedThisFrame);
 
             bool kDown = (keyboard != null && keyboard.kKey.wasPressedThisFrame) || Input.GetKeyDown(KeyCode.K) || (gamepad != null && gamepad.buttonWest.wasPressedThisFrame);
@@ -122,8 +126,13 @@ namespace Football.Locomotion
             Vector3 toBall = ball != null ? (ball.transform.position - transform.position) : Vector3.zero;
             toBall.y = 0f;
             float distToBall = ball != null ? toBall.magnitude : 99f;
-            bool isKickoff = (GameEvents.CurrentMatchState == MatchState.KickOff);
-            bool isInPossession = runtimeState.hasBall || distToBall < 3.8f || isKickoff;
+            bool isRestartState = (GameEvents.CurrentMatchState == MatchState.KickOff ||
+                                   GameEvents.CurrentMatchState == MatchState.ThrowIn ||
+                                   GameEvents.CurrentMatchState == MatchState.CornerKick ||
+                                   GameEvents.CurrentMatchState == MatchState.GoalKick ||
+                                   GameEvents.CurrentMatchState == MatchState.FreeKick ||
+                                   GameEvents.CurrentMatchState == MatchState.PenaltyKick);
+            bool isInPossession = runtimeState.hasBall || distToBall < 4.5f || isRestartState;
 
             bool kickDown = spaceDown || lDown;
             bool kickHeld = spaceHeld || lHeld;
@@ -141,6 +150,44 @@ namespace Football.Locomotion
 
         private void HandlePossessionInput(Vector3 aimDir, Keyboard keyboard, bool kickDown, bool kickHeld, bool kickUp, bool passDown, bool passUp, bool lobDown, bool lobUp, bool throughDown, bool throughUp)
         {
+            bool isRestartState = (GameEvents.CurrentMatchState == MatchState.KickOff ||
+                                   GameEvents.CurrentMatchState == MatchState.ThrowIn ||
+                                   GameEvents.CurrentMatchState == MatchState.CornerKick ||
+                                   GameEvents.CurrentMatchState == MatchState.GoalKick ||
+                                   GameEvents.CurrentMatchState == MatchState.FreeKick ||
+                                   GameEvents.CurrentMatchState == MatchState.PenaltyKick);
+
+            // Instant restart execution on any pass/kick key down or up
+            if (isRestartState)
+            {
+                if (kickDown || kickUp)
+                {
+                    ExecuteReleaseShot(aimDir, keyboard);
+                    return;
+                }
+                if (passDown || passUp)
+                {
+                    Transform target = FindTeammateInDirection(aimDir);
+                    actions.ReleasePass(PassType.Ground, aimDir, target);
+                    if (target != null) GameEvents.TriggerPassInitiated(runtimeState.teamId, target);
+                    return;
+                }
+                if (lobDown || lobUp)
+                {
+                    Transform target = FindTeammateInDirection(aimDir);
+                    actions.ReleasePass(PassType.Lobbed, aimDir, target);
+                    if (target != null) GameEvents.TriggerPassInitiated(runtimeState.teamId, target);
+                    return;
+                }
+                if (throughDown || throughUp)
+                {
+                    Transform target = FindTeammateInDirection(aimDir);
+                    actions.ReleasePass(PassType.ThroughBall, aimDir, target);
+                    if (target != null) GameEvents.TriggerPassInitiated(runtimeState.teamId, target);
+                    return;
+                }
+            }
+
             // --- Shooting / Powerful Kick (Spacebar / L Key) ---
             if (kickDown)
             {

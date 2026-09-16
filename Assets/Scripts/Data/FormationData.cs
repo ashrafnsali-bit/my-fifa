@@ -102,19 +102,21 @@ namespace Football.Data
         /// </summary>
         public static Vector3 GetWorldPosition(FormationSlot slot, int teamId, float teamShiftZ = 0f, float pitchWidthScale = 0.85f)
         {
+            bool isDefendingNegativeZ = (teamId == 1 && PitchConstants.Team1DefendsNegativeZ) || (teamId == 2 && !PitchConstants.Team1DefendsNegativeZ);
+
             if (slot.position == PlayerPosition.GK)
             {
                 // Goalkeeper stands centrally right between the posts (1.8m in front of goal line)
-                float gkZ = (teamId == 1) ? (-PitchConstants.HalfLength + 1.8f) : (PitchConstants.HalfLength - 1.8f);
+                float gkZ = isDefendingNegativeZ ? (-PitchConstants.HalfLength + 1.8f) : (PitchConstants.HalfLength - 1.8f);
                 return new Vector3(0f, 0f, gkZ);
             }
 
             float x = slot.normalizedOffset.x * PitchConstants.HalfWidth * pitchWidthScale;
             float z = slot.normalizedOffset.y * PitchConstants.HalfLength * 0.85f;
 
-            if (teamId == 2)
+            if (!isDefendingNegativeZ)
             {
-                // Mirror for away team defending positive Z
+                // Mirror for team defending positive Z
                 x = -x;
                 z = -z;
                 z -= teamShiftZ;

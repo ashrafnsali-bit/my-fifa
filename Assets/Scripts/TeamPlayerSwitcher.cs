@@ -24,7 +24,7 @@ public class TeamPlayerSwitcher : MonoBehaviour
     public PlayerOverheadMarker overheadMarker;
 
     [Header("Switching Tuning")]
-    public float minSwitchInterval = 0.28f;
+    public float minSwitchInterval = 0.18f;
     public float receiverAnticipationDistance = 32f;
 
     private float lastSwitchTime = -10f;
@@ -92,6 +92,7 @@ public class TeamPlayerSwitcher : MonoBehaviour
     private void Update()
     {
         if (teamPlayers.Count == 0) return;
+        if (GameEvents.CurrentMatchState != MatchState.InPlay) return;
 
         float dt = Time.deltaTime;
         var ball = FootballBall.Instance;
@@ -121,8 +122,26 @@ public class TeamPlayerSwitcher : MonoBehaviour
         Vector3 ballVel = ball.Velocity;
         float ballSpeed = ballVel.magnitude;
 
-        // 3. INSTANT AUTO-SWITCH TO PASS RECEIVER / BALL TARGET:
-        // Always checks if the ball is moving towards any teammate (passes, through balls, clearances)
+        // 3. POSSESSION AUTO-SWITCH:
+        // If any outfield teammate has the ball, switch immediately to them
+        for (int i = 0; i < teamPlayers.Count; i++)
+        {
+            var p = teamPlayers[i];
+            if (p == null || p.isSentOff) continue;
+            // Goalkeeper is managed exclusively by specialized goalkeeper AI
+            if (p.attributes != null && p.attributes.position == PlayerPosition.GK) continue;
+
+            if (p.hasBall || Vector3.Distance(p.transform.position, ballPos) < 1.4f)
+            {
+                if (p != currentActivePlayer)
+                {
+                    SwitchToPlayer(p);
+                    return;
+                }
+            }
+        }
+
+        // 4. INSTANT AUTO-SWITCH TO PASS RECEIVER / BALL TARGET:
         if (ballSpeed > 1.8f)
         {
             PlayerRuntimeState bestReceiver = FindTeammateBallIsTravelingTowards(ballPos, ballVel);
@@ -133,42 +152,25 @@ public class TeamPlayerSwitcher : MonoBehaviour
             }
         }
 
-        // 4. POSSESSION AUTO-SWITCH:
-        // Only switch among OUTFIELD teammates who have the ball
-        for (int i = 0; i < teamPlayers.Count; i++)
-        {
-            var p = teamPlayers[i];
-            if (p == null || p.isSentOff) continue;
-            // Goalkeeper is managed exclusively by specialized goalkeeper AI
-            if (p.attributes != null && p.attributes.position == PlayerPosition.GK) continue;
-
-            if (p.hasBall || Vector3.Distance(p.transform.position, ballPos) < 1.6f)
-            {
-                if (p != currentActivePlayer)
-                {
-                    SwitchToPlayer(p);
-                    return;
-                }
-            }
-        }
-
         if (Time.time - lastSwitchTime < minSwitchInterval) return;
 
-        // 5. DEFENDING AUTO-SWITCH:
-        // If active player is far from the ball and another outfield teammate is significantly closer
-        if (currentActivePlayer != null)
+        // 5. ALWAYS AUTO-SWITCH TO THE CLOSEST TEAMMATE TO THE BALL:
+        PlayerRuntimeState nearest = GetNearestTeammateToBall(ballPos);
+        if (nearest != null && nearest != currentActivePlayer)
         {
-            float activeDist = Vector3.Distance(currentActivePlayer.transform.position, ballPos);
-            if (activeDist > 7.0f)
+            if (currentActivePlayer == null)
             {
-                PlayerRuntimeState nearest = GetNearestTeammateToBall(ballPos);
-                if (nearest != null && nearest != currentActivePlayer)
+                SwitchToPlayer(nearest);
+            }
+            else
+            {
+                float activeDist = Vector3.Distance(currentActivePlayer.transform.position, ballPos);
+                float nearestDist = Vector3.Distance(nearest.transform.position, ballPos);
+
+                // 0.8m buffer guarantees crisp switching to the nearest player while preventing jitter
+                if (nearestDist < activeDist - 0.8f)
                 {
-                    float nearestDist = Vector3.Distance(nearest.transform.position, ballPos);
-                    if (nearestDist < activeDist - 3.2f)
-                    {
-                        SwitchToPlayer(nearest);
-                    }
+                    SwitchToPlayer(nearest);
                 }
             }
         }

@@ -86,15 +86,34 @@ namespace Football.Core
             return new Vector3(x, 0f, z);
         }
 
+        public static int CurrentHalf = 1;
+
+        public static bool Team1DefendsNegativeZ => CurrentHalf != 2;
+
         public static Vector3 GetTargetGoalCenter(int teamId)
         {
-            // Team 1 attacks Away Goal (+Z), Team 2 attacks Home Goal (-Z)
-            return teamId == 1 ? AwayGoalCenter : HomeGoalCenter;
+            if (Team1DefendsNegativeZ)
+            {
+                // Half 1: Team 1 attacks +Z (AwayGoal), Team 2 attacks -Z (HomeGoal)
+                return teamId == 1 ? AwayGoalCenter : HomeGoalCenter;
+            }
+            else
+            {
+                // Half 2: Team 1 attacks -Z (HomeGoal), Team 2 attacks +Z (AwayGoal) [Swapped Sides]
+                return teamId == 1 ? HomeGoalCenter : AwayGoalCenter;
+            }
         }
 
         public static Vector3 GetDefendingGoalCenter(int teamId)
         {
-            return teamId == 1 ? HomeGoalCenter : AwayGoalCenter;
+            if (Team1DefendsNegativeZ)
+            {
+                return teamId == 1 ? HomeGoalCenter : AwayGoalCenter;
+            }
+            else
+            {
+                return teamId == 1 ? AwayGoalCenter : HomeGoalCenter;
+            }
         }
     }
 }

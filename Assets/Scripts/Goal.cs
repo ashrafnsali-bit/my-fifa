@@ -37,9 +37,11 @@ public class Goal : MonoBehaviour
             }
 
             lastTriggerTime = Time.time;
-            Debug.Log("Goal! Ball entered goal of team: " + teamGoalID);
-            
-            int scoringTeam = (teamGoalID == 1) ? 2 : 1;
+            // teamGoalID 1 is Home Goal (-Z), teamGoalID 2 is Away Goal (+Z)
+            int defendingTeam = (teamGoalID == 1) 
+                ? (PitchConstants.Team1DefendsNegativeZ ? 1 : 2) 
+                : (PitchConstants.Team1DefendsNegativeZ ? 2 : 1);
+            int scoringTeam = (defendingTeam == 1) ? 2 : 1;
 
             GameEvents.TriggerGoalScored(scoringTeam, other.transform.position);
 
