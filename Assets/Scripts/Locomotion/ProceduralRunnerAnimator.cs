@@ -62,6 +62,10 @@ namespace Football.Locomotion
         private const float KickDuration = 0.28f;
         private bool isRightLegKicking = true;
 
+        private bool isTackling;
+        private float tackleTimer;
+        private const float TackleDuration = 0.32f;
+
         private bool isDiving;
         private float diveTimer;
         private const float DiveDuration = 0.60f;
@@ -73,6 +77,12 @@ namespace Football.Locomotion
             isKicking = true;
             kickTimer = 0f;
             isRightLegKicking = rightFoot;
+        }
+
+        public void TriggerStandingTackleAnimation()
+        {
+            isTackling = true;
+            tackleTimer = 0f;
         }
 
         public void TriggerGoalkeeperDive(bool diveRight, bool highSave = false)
@@ -297,7 +307,28 @@ namespace Football.Locomotion
                 }
             }
 
-            // 4. Goalkeeper holding ball in hands posture
+            // 4. Standing Tackle Poke Animation
+            if (isTackling)
+            {
+                tackleTimer += dt;
+                float progress = tackleTimer / TackleDuration;
+                if (progress >= 1.0f)
+                {
+                    isTackling = false;
+                }
+                else
+                {
+                    float pokeReach = Mathf.Sin(progress * Mathf.PI);
+                    if (rightLeg != null) rightLeg.localRotation = initialRightLegRot * Quaternion.Euler(-55f * pokeReach, 0f, 0f);
+                    if (rightKnee != null) rightKnee.localRotation = initialRightKneeRot * Quaternion.Euler(10f * pokeReach, 0f, 0f);
+                    if (rightAnkle != null) rightAnkle.localRotation = initialRightAnkleRot * Quaternion.Euler(30f * pokeReach, 0f, 0f);
+                    if (leftLeg != null) leftLeg.localRotation = initialLeftLegRot * Quaternion.Euler(15f * pokeReach, 0f, 0f);
+                    if (torso != null) torso.localRotation = initialTorsoLocalRot * Quaternion.Euler(12f * pokeReach, 0f, 0f);
+                    return;
+                }
+            }
+
+            // 5. Goalkeeper holding ball in hands posture
             if (runtimeState != null && runtimeState.isHoldingBallInHands)
             {
                 if (leftArm != null) leftArm.localRotation = initialLeftArmRot * Quaternion.Euler(-62f, 22f, 15f);

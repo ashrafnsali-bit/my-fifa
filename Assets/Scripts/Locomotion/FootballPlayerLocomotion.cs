@@ -165,6 +165,7 @@ namespace Football.Locomotion
             float sprintAttr = runtimeState.attributes != null ? runtimeState.attributes.sprintSpeed : 75f;
             float accelAttr = runtimeState.attributes != null ? runtimeState.attributes.acceleration : 75f;
             float agilityAttr = runtimeState.attributes != null ? runtimeState.attributes.agility : 75f;
+            float strengthAttr = runtimeState.attributes != null ? runtimeState.attributes.strength : 70f;
             float speedMult = runtimeState.SpeedMultiplier;
 
             float maxSpeed = isSprinting
@@ -173,17 +174,45 @@ namespace Football.Locomotion
 
             Vector3 targetVel = targetMoveDirection * maxSpeed;
 
-            // First-step explosive acceleration burst
-            bool isStandingStart = currentVelocity.sqrMagnitude < 1.0f && targetMoveDirection.sqrMagnitude > 0.1f;
-            float firstStepMultiplier = isStandingStart ? 1.45f : 1.0f;
+            // 1. Sharp 180-Degree Cut & Pivot Detection:
+            // If player suddenly reverses direction while moving at speed, apply a sharp braking plant
+            bool isSharpCut = false;
+            if (currentVelocity.sqrMagnitude > 4.0f && targetMoveDirection.sqrMagnitude > 0.1f)
+            {
+                float dirAlignment = Vector3.Dot(currentVelocity.normalized, targetMoveDirection.normalized);
+                if (dirAlignment < -0.40f) // Sharp reverse (> 115 degrees)
+                {
+                    isSharpCut = true;
+                }
+            }
+
+            // First-step explosive acceleration burst vs sharp cut plant
+            bool isStandingStart = currentVelocity.sqrMagnitude < 0.8f && targetMoveDirection.sqrMagnitude > 0.1f;
+            float firstStepMultiplier = isStandingStart ? 1.45f : (isSharpCut ? 0.65f : 1.0f);
 
             // Goalkeeper explosive reflex multiplier
             bool isGK = runtimeState.attributes != null && runtimeState.attributes.position == PlayerPosition.GK;
             float gkAccelMult = isGK ? 3.0f : 1.0f;
 
-            float currentAccel = targetMoveDirection.sqrMagnitude > 0.01f 
-                ? accelerationRate * (accelAttr / 70f) * gkAccelMult * firstStepMultiplier 
-                : decelerationRate * (agilityAttr / 70f);
+            // 2. Realistic Inertia & Deceleration Curve
+            float currentAccel;
+            if (targetMoveDirection.sqrMagnitude > 0.01f)
+            {
+                if (isSharpCut)
+                {
+                    // Sharp cut: rapid brake first to plant cleats, then accelerate into cut
+                    currentAccel = decelerationRate * 1.6f * (agilityAttr / 70f);
+                }
+                else
+                {
+                    currentAccel = accelerationRate * (accelAttr / 70f) * gkAccelMult * firstStepMultiplier;
+                }
+            }
+            else
+            {
+                // Smooth natural coasting deceleration (Inertia glide to stop)
+                currentAccel = decelerationRate * (agilityAttr / 70f) * 0.85f;
+            }
 
             currentVelocity = Vector3.MoveTowards(currentVelocity, targetVel, currentAccel * dt);
 
@@ -194,7 +223,7 @@ namespace Football.Locomotion
             nextPos.y = 0.0f;
             rb.MovePosition(nextPos);
 
-            // Dynamic rotation with agility scaling
+            // 3. Dynamic Smooth Rotation with Agility & Slerp
             float dynamicTurnSpeed = turnSpeed * (agilityAttr / 70f);
             var ballObj = FootballBall.Instance;
 
@@ -223,10 +252,14 @@ namespace Football.Locomotion
             else if (targetMoveDirection.sqrMagnitude > 0.01f)
             {
                 Quaternion targetRot = Quaternion.LookRotation(targetMoveDirection, Vector3.up);
+                // Use Slerp interpolation for authentic athletic weight transfer
                 rb.MoveRotation(Quaternion.RotateTowards(rb.rotation, targetRot, dynamicTurnSpeed * dt));
             }
 
-            // Stamina update
+            // 4. Physical Shoulder-to-Shoulder Jostling when running alongside opponent
+            HandleShoulderJostling(strengthAttr, dt);
+
+            // 5. Stamina update & movement state
             if (isSprinting)
             {
                 runtimeState.ConsumeStamina(dt);
@@ -415,8 +448,9 @@ namespace Football.Locomotion
                 runtimeState.hasBall = true;
                 runtimeState.currentState = MovementState.Dribbling;
 
-                // Close-control touch: keep ball safely at boots/feet
-                Vector3 desiredBallPos = transform.position + transform.forward * dribblePushOffset;
+                // Close-control touch: natural stride distance depending on sprint vs jog
+                float dynamicPushOffset = isSprinting ? 1.15f : dribblePushOffset;
+                Vector3 desiredBallPos = transform.position + transform.forward * dynamicPushOffset;
                 desiredBallPos.y = ball.ballRadius;
 
                 Vector3 ballCorrection = desiredBallPos - ball.transform.position;
@@ -424,15 +458,16 @@ namespace Football.Locomotion
 
                 if (targetMoveDirection.sqrMagnitude > 0.05f)
                 {
-                    // Running with ball: guide smoothly in stride
-                    Vector3 touchVel = (transform.forward * currentVelocity.magnitude + ballCorrection * 4.0f);
-                    ball.BallRigidbody.linearVelocity = Vector3.Lerp(ball.BallRigidbody.linearVelocity, touchVel, 10.0f * dt);
+                    // Touch Dribble Physics: Guide ball smoothly ahead with athletic touches
+                    float touchSpeed = Mathf.Max(currentVelocity.magnitude, 2.5f);
+                    Vector3 touchVel = (transform.forward * touchSpeed + ballCorrection * 5.0f);
+                    ball.BallRigidbody.linearVelocity = Vector3.Lerp(ball.BallRigidbody.linearVelocity, touchVel, (isSprinting ? 7.5f : 12.0f) * dt);
                 }
                 else
                 {
                     // Stopped / standing still: snug ball right at boots, zero roll-away!
-                    ball.BallRigidbody.linearVelocity = Vector3.Lerp(ball.BallRigidbody.linearVelocity, ballCorrection * 2.0f, 15.0f * dt);
-                    ball.BallRigidbody.angularVelocity = Vector3.Lerp(ball.BallRigidbody.angularVelocity, Vector3.zero, 15.0f * dt);
+                    ball.BallRigidbody.linearVelocity = Vector3.Lerp(ball.BallRigidbody.linearVelocity, ballCorrection * 2.5f, 18.0f * dt);
+                    ball.BallRigidbody.angularVelocity = Vector3.Lerp(ball.BallRigidbody.angularVelocity, Vector3.zero, 18.0f * dt);
                 }
 
                 ball.lastTeamPossession = runtimeState.teamId;
@@ -443,6 +478,42 @@ namespace Football.Locomotion
                 if (runtimeState.hasBall && dist > dribbleRadius * 1.5f)
                 {
                     runtimeState.hasBall = false;
+                }
+            }
+        }
+
+        private void HandleShoulderJostling(float strengthAttr, float dt)
+        {
+            if (rb == null || currentVelocity.sqrMagnitude < 4.0f) return;
+
+            // Detect opposing players running closely alongside
+            var allPlayers = FindObjectsByType<PlayerRuntimeState>(FindObjectsSortMode.None);
+            for (int i = 0; i < allPlayers.Length; i++)
+            {
+                var other = allPlayers[i];
+                if (other == null || other == runtimeState || other.teamId == runtimeState.teamId || other.isSentOff) continue;
+
+                Vector3 toOther = other.transform.position - transform.position;
+                toOther.y = 0f;
+                float d = toOther.magnitude;
+
+                if (d < 1.1f && d > 0.05f)
+                {
+                    // Players are shoulder-to-shoulder!
+                    float otherStrength = other.attributes != null ? other.attributes.strength : 70f;
+                    float strengthDiff = (strengthAttr - otherStrength) / 100f;
+
+                    // Apply slight physical displacement impulse based on relative strength
+                    Vector3 pushDir = -toOther.normalized;
+                    if (strengthDiff > 0.1f)
+                    {
+                        // Stronger player nudges weaker player slightly off-balance
+                        var otherRb = other.GetComponent<Rigidbody>();
+                        if (otherRb != null)
+                        {
+                            otherRb.AddForce(-pushDir * (3.5f + strengthDiff * 6f), ForceMode.Impulse);
+                        }
+                    }
                 }
             }
         }

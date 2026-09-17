@@ -484,6 +484,13 @@ namespace Football.Locomotion
             }
 
             runtimeState.currentState = MovementState.Tackling;
+
+            var anim = GetComponent<ProceduralRunnerAnimator>();
+            if (anim != null)
+            {
+                anim.TriggerStandingTackleAnimation();
+            }
+
             var ball = FootballBall.Instance;
             if (ball == null) return;
 
@@ -491,8 +498,8 @@ namespace Football.Locomotion
 
             if (distToBall <= standingTackleRadius)
             {
-                // Successfully won ball
-                Vector3 tacklePokeDir = transform.forward + Vector3.up * 0.1f;
+                // Successfully won ball: poke away or win possession
+                Vector3 tacklePokeDir = transform.forward + Vector3.up * 0.15f;
                 ball.Kick(tacklePokeDir * standingTackleForce, Vector3.zero, runtimeState.jerseyNumber, runtimeState.teamId);
                 if (locomotion != null) locomotion.OnBallKicked(0.5f);
                 GameEvents.TriggerTackleExecuted(runtimeState.teamId, true);
