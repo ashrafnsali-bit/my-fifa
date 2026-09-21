@@ -9,6 +9,8 @@ namespace Football.Locomotion
     public class FootballInputHandler : MonoBehaviour
     {
         public bool isHumanControlled = true;
+        [Tooltip("1 = Player 1 (Team 1, WASD/Gamepad1), 2 = Player 2 (Team 2, Arrows/Keypad/Gamepad2)")]
+        public int playerIndex = 1;
 
         private FootballPlayerLocomotion locomotion;
         private FootballPlayerActions actions;
@@ -19,6 +21,10 @@ namespace Football.Locomotion
             locomotion = GetComponent<FootballPlayerLocomotion>();
             actions = GetComponent<FootballPlayerActions>();
             runtimeState = GetComponent<PlayerRuntimeState>();
+            if (runtimeState != null)
+            {
+                playerIndex = runtimeState.teamId == 2 ? 2 : 1;
+            }
         }
 
         private void Update()
@@ -35,64 +41,124 @@ namespace Football.Locomotion
             bool sprintHeld = false;
 
             var keyboard = Keyboard.current;
-            var gamepad = Gamepad.current;
-
-            // 1. Unified robust input reading (New Input System + Legacy Input fallback)
-            var mouse = Mouse.current;
-            bool enterDown = (keyboard != null && (keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame)) || Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter);
-            bool mouseDown = (mouse != null && mouse.leftButton.wasPressedThisFrame) || Input.GetMouseButtonDown(0);
-
-            bool spaceDown = (keyboard != null && keyboard.spaceKey.wasPressedThisFrame) || Input.GetKeyDown(KeyCode.Space) || enterDown || mouseDown;
-            bool spaceHeld = (keyboard != null && keyboard.spaceKey.isPressed) || Input.GetKey(KeyCode.Space) || Input.GetKey(KeyCode.Return);
-            bool spaceUp = (keyboard != null && keyboard.spaceKey.wasReleasedThisFrame) || Input.GetKeyUp(KeyCode.Space) || Input.GetKeyUp(KeyCode.Return) || Input.GetMouseButtonUp(0);
-
-            bool lDown = (keyboard != null && keyboard.lKey.wasPressedThisFrame) || Input.GetKeyDown(KeyCode.L) || (gamepad != null && gamepad.buttonEast.wasPressedThisFrame);
-            bool lHeld = (keyboard != null && keyboard.lKey.isPressed) || Input.GetKey(KeyCode.L) || (gamepad != null && gamepad.buttonEast.isPressed);
-            bool lUp = (keyboard != null && keyboard.lKey.wasReleasedThisFrame) || Input.GetKeyUp(KeyCode.L) || (gamepad != null && gamepad.buttonEast.wasReleasedThisFrame);
-
-            bool jDown = (keyboard != null && keyboard.jKey.wasPressedThisFrame) || Input.GetKeyDown(KeyCode.J) || (gamepad != null && gamepad.buttonSouth.wasPressedThisFrame) || enterDown || mouseDown;
-            bool jUp = (keyboard != null && keyboard.jKey.wasReleasedThisFrame) || Input.GetKeyUp(KeyCode.J) || (gamepad != null && gamepad.buttonSouth.wasReleasedThisFrame);
-
-            bool kDown = (keyboard != null && keyboard.kKey.wasPressedThisFrame) || Input.GetKeyDown(KeyCode.K) || (gamepad != null && gamepad.buttonWest.wasPressedThisFrame);
-            bool kUp = (keyboard != null && keyboard.kKey.wasReleasedThisFrame) || Input.GetKeyUp(KeyCode.K) || (gamepad != null && gamepad.buttonWest.wasReleasedThisFrame);
-
-            bool iDown = (keyboard != null && keyboard.iKey.wasPressedThisFrame) || Input.GetKeyDown(KeyCode.I) || (gamepad != null && gamepad.buttonNorth.wasPressedThisFrame);
-            bool iUp = (keyboard != null && keyboard.iKey.wasReleasedThisFrame) || Input.GetKeyUp(KeyCode.I) || (gamepad != null && gamepad.buttonNorth.wasReleasedThisFrame);
-
-            // Read directional movement from Keyboard
-            if (keyboard != null)
+            var gamepads = Gamepad.all;
+            Gamepad myGamepad = null;
+            if (gamepads.Count >= playerIndex)
             {
-                if (keyboard.wKey.isPressed || keyboard.upArrowKey.isPressed) moveInput.y += 1f;
-                if (keyboard.sKey.isPressed || keyboard.downArrowKey.isPressed) moveInput.y -= 1f;
-                if (keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed) moveInput.x += 1f;
-                if (keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed) moveInput.x -= 1f;
+                myGamepad = gamepads[playerIndex - 1];
+            }
+            else if (gamepads.Count > 0 && playerIndex == 1)
+            {
+                myGamepad = gamepads[0];
+            }
 
-                if (keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed)
+            bool spaceDown = false, spaceHeld = false, spaceUp = false;
+            bool lDown = false, lHeld = false, lUp = false;
+            bool jDown = false, jUp = false;
+            bool kDown = false, kUp = false;
+            bool iDown = false, iUp = false;
+
+            var mouse = Mouse.current;
+
+            if (playerIndex == 1)
+            {
+                // === PLAYER 1 BINDINGS (Team 1: WASD / Left Hand + Mouse / Gamepad 1) ===
+                bool enterDown = (keyboard != null && (keyboard.enterKey.wasPressedThisFrame)) || Input.GetKeyDown(KeyCode.Return);
+                bool mouseDown = (mouse != null && mouse.leftButton.wasPressedThisFrame) || Input.GetMouseButtonDown(0);
+
+                spaceDown = (keyboard != null && keyboard.spaceKey.wasPressedThisFrame) || Input.GetKeyDown(KeyCode.Space) || enterDown || mouseDown;
+                spaceHeld = (keyboard != null && keyboard.spaceKey.isPressed) || Input.GetKey(KeyCode.Space) || Input.GetKey(KeyCode.Return);
+                spaceUp = (keyboard != null && keyboard.spaceKey.wasReleasedThisFrame) || Input.GetKeyUp(KeyCode.Space) || Input.GetKeyUp(KeyCode.Return) || Input.GetMouseButtonUp(0);
+
+                lDown = (keyboard != null && keyboard.lKey.wasPressedThisFrame) || Input.GetKeyDown(KeyCode.L) || (myGamepad != null && myGamepad.buttonEast.wasPressedThisFrame);
+                lHeld = (keyboard != null && keyboard.lKey.isPressed) || Input.GetKey(KeyCode.L) || (myGamepad != null && myGamepad.buttonEast.isPressed);
+                lUp = (keyboard != null && keyboard.lKey.wasReleasedThisFrame) || Input.GetKeyUp(KeyCode.L) || (myGamepad != null && myGamepad.buttonEast.wasReleasedThisFrame);
+
+                jDown = (keyboard != null && keyboard.jKey.wasPressedThisFrame) || Input.GetKeyDown(KeyCode.J) || (myGamepad != null && myGamepad.buttonSouth.wasPressedThisFrame) || enterDown || mouseDown;
+                jUp = (keyboard != null && keyboard.jKey.wasReleasedThisFrame) || Input.GetKeyUp(KeyCode.J) || (myGamepad != null && myGamepad.buttonSouth.wasReleasedThisFrame);
+
+                kDown = (keyboard != null && keyboard.kKey.wasPressedThisFrame) || Input.GetKeyDown(KeyCode.K) || (myGamepad != null && myGamepad.buttonWest.wasPressedThisFrame);
+                kUp = (keyboard != null && keyboard.kKey.wasReleasedThisFrame) || Input.GetKeyUp(KeyCode.K) || (myGamepad != null && myGamepad.buttonWest.wasReleasedThisFrame);
+
+                iDown = (keyboard != null && keyboard.iKey.wasPressedThisFrame) || Input.GetKeyDown(KeyCode.I) || (myGamepad != null && myGamepad.buttonNorth.wasPressedThisFrame);
+                iUp = (keyboard != null && keyboard.iKey.wasReleasedThisFrame) || Input.GetKeyUp(KeyCode.I) || (myGamepad != null && myGamepad.buttonNorth.wasReleasedThisFrame);
+
+                // WASD Directional Movement
+                if (keyboard != null)
                 {
-                    sprintHeld = true;
+                    if (keyboard.wKey.isPressed) moveInput.y += 1f;
+                    if (keyboard.sKey.isPressed) moveInput.y -= 1f;
+                    if (keyboard.dKey.isPressed) moveInput.x += 1f;
+                    if (keyboard.aKey.isPressed) moveInput.x -= 1f;
+                    if (keyboard.leftShiftKey.isPressed) sprintHeld = true;
+                }
+                if (moveInput == Vector2.zero)
+                {
+                    if (Input.GetKey(KeyCode.W)) moveInput.y += 1f;
+                    if (Input.GetKey(KeyCode.S)) moveInput.y -= 1f;
+                    if (Input.GetKey(KeyCode.D)) moveInput.x += 1f;
+                    if (Input.GetKey(KeyCode.A)) moveInput.x -= 1f;
+                    if (Input.GetKey(KeyCode.LeftShift)) sprintHeld = true;
+                }
+            }
+            else
+            {
+                // === PLAYER 2 BINDINGS (Team 2: Arrow Keys / Keypad / Gamepad 2) ===
+                bool kp1Down = (keyboard != null && keyboard.numpad1Key.wasPressedThisFrame) || Input.GetKeyDown(KeyCode.Keypad1) || Input.GetKeyDown(KeyCode.Period) || (myGamepad != null && myGamepad.buttonSouth.wasPressedThisFrame);
+                bool kp1Up = (keyboard != null && keyboard.numpad1Key.wasReleasedThisFrame) || Input.GetKeyUp(KeyCode.Keypad1) || Input.GetKeyUp(KeyCode.Period) || (myGamepad != null && myGamepad.buttonSouth.wasReleasedThisFrame);
+
+                bool kp3Down = (keyboard != null && keyboard.numpad3Key.wasPressedThisFrame) || Input.GetKeyDown(KeyCode.Keypad3) || Input.GetKeyDown(KeyCode.RightControl) || (myGamepad != null && myGamepad.buttonEast.wasPressedThisFrame);
+                bool kp3Held = (keyboard != null && keyboard.numpad3Key.isPressed) || Input.GetKey(KeyCode.Keypad3) || Input.GetKey(KeyCode.RightControl) || (myGamepad != null && myGamepad.buttonEast.isPressed);
+                bool kp3Up = (keyboard != null && keyboard.numpad3Key.wasReleasedThisFrame) || Input.GetKeyUp(KeyCode.Keypad3) || Input.GetKeyUp(KeyCode.RightControl) || (myGamepad != null && myGamepad.buttonEast.wasReleasedThisFrame);
+
+                bool kp2Down = (keyboard != null && keyboard.numpad2Key.wasPressedThisFrame) || Input.GetKeyDown(KeyCode.Keypad2) || Input.GetKeyDown(KeyCode.Slash) || (myGamepad != null && myGamepad.buttonWest.wasPressedThisFrame);
+                bool kp2Up = (keyboard != null && keyboard.numpad2Key.wasReleasedThisFrame) || Input.GetKeyUp(KeyCode.Keypad2) || Input.GetKeyUp(KeyCode.Slash) || (myGamepad != null && myGamepad.buttonWest.wasReleasedThisFrame);
+
+                bool kp5Down = (keyboard != null && keyboard.numpad5Key.wasPressedThisFrame) || Input.GetKeyDown(KeyCode.Keypad5) || Input.GetKeyDown(KeyCode.Quote) || (myGamepad != null && myGamepad.buttonNorth.wasPressedThisFrame);
+                bool kp5Up = (keyboard != null && keyboard.numpad5Key.wasReleasedThisFrame) || Input.GetKeyUp(KeyCode.Keypad5) || Input.GetKeyUp(KeyCode.Quote) || (myGamepad != null && myGamepad.buttonNorth.wasReleasedThisFrame);
+
+                spaceDown = kp3Down;
+                spaceHeld = kp3Held;
+                spaceUp = kp3Up;
+                lDown = kp3Down;
+                lHeld = kp3Held;
+                lUp = kp3Up;
+                jDown = kp1Down;
+                jUp = kp1Up;
+                kDown = kp2Down;
+                kUp = kp2Up;
+                iDown = kp5Down;
+                iUp = kp5Up;
+
+                // Arrow Keys Movement
+                if (keyboard != null)
+                {
+                    if (keyboard.upArrowKey.isPressed) moveInput.y += 1f;
+                    if (keyboard.downArrowKey.isPressed) moveInput.y -= 1f;
+                    if (keyboard.rightArrowKey.isPressed) moveInput.x += 1f;
+                    if (keyboard.leftArrowKey.isPressed) moveInput.x -= 1f;
+                    if (keyboard.rightShiftKey.isPressed || keyboard.numpad0Key.isPressed) sprintHeld = true;
+                }
+                if (moveInput == Vector2.zero)
+                {
+                    if (Input.GetKey(KeyCode.UpArrow)) moveInput.y += 1f;
+                    if (Input.GetKey(KeyCode.DownArrow)) moveInput.y -= 1f;
+                    if (Input.GetKey(KeyCode.RightArrow)) moveInput.x += 1f;
+                    if (Input.GetKey(KeyCode.LeftArrow)) moveInput.x -= 1f;
+                    if (Input.GetKey(KeyCode.RightShift) || Input.GetKey(KeyCode.Keypad0)) sprintHeld = true;
                 }
             }
 
-            // Legacy Input fallback for movement
-            if (moveInput == Vector2.zero)
+            // Gamepad stick & trigger inputs
+            if (myGamepad != null)
             {
-                if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) moveInput.y += 1f;
-                if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) moveInput.y -= 1f;
-                if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) moveInput.x += 1f;
-                if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) moveInput.x -= 1f;
-                if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) sprintHeld = true;
-            }
-
-            // Read Gamepad input
-            if (gamepad != null)
-            {
-                Vector2 stick = gamepad.leftStick.ReadValue();
+                Vector2 stick = myGamepad.leftStick.ReadValue();
                 if (stick.sqrMagnitude > 0.04f)
                 {
                     moveInput = stick;
                 }
 
-                if (gamepad.rightTrigger.isPressed || gamepad.rightShoulder.isPressed)
+                if (myGamepad.rightTrigger.isPressed || myGamepad.rightShoulder.isPressed)
                 {
                     sprintHeld = true;
                 }

@@ -92,6 +92,7 @@ namespace Football.Presentation
             Football.Core.GameEvents.OnWoodworkHit += HandleWoodworkShake;
             Football.Core.GameEvents.OnGoalScored += HandleGoalShake;
             Football.Core.GameEvents.OnCameraSnapRequested += SnapToBall;
+            Football.Core.GameEvents.OnPowerShotInitiated += HandlePowerShotCinematic;
         }
 
         private void OnDisable()
@@ -99,6 +100,33 @@ namespace Football.Presentation
             Football.Core.GameEvents.OnWoodworkHit -= HandleWoodworkShake;
             Football.Core.GameEvents.OnGoalScored -= HandleGoalShake;
             Football.Core.GameEvents.OnCameraSnapRequested -= SnapToBall;
+            Football.Core.GameEvents.OnPowerShotInitiated -= HandlePowerShotCinematic;
+        }
+
+        private void HandlePowerShotCinematic(Transform shooter, float power)
+        {
+            StartCoroutine(PowerShotSequenceRoutine(shooter, power));
+        }
+
+        private System.Collections.IEnumerator PowerShotSequenceRoutine(Transform shooter, float power)
+        {
+            AddTrauma(0.75f);
+            float originalTimeScale = Time.timeScale;
+            float originalDistance = distanceToBall;
+            float originalFOV = baseFieldOfView;
+
+            // Dramatic close snap
+            distanceToBall = Mathf.Max(minDistance, originalDistance * 0.65f);
+            baseFieldOfView = 26f;
+            Time.timeScale = 0.35f;
+
+            // Slow motion punch window
+            yield return new WaitForSecondsRealtime(0.38f);
+
+            Time.timeScale = 1.0f;
+            baseFieldOfView = originalFOV;
+            distanceToBall = originalDistance;
+            AddTrauma(0.45f);
         }
 
         private void HandleWoodworkShake()
@@ -108,7 +136,7 @@ namespace Football.Presentation
 
         private void HandleGoalShake(int teamId, Vector3 pos)
         {
-            AddTrauma(0.65f);
+            AddTrauma(0.75f);
         }
 
         private void OnValidate()

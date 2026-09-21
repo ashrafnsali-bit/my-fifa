@@ -11,6 +11,7 @@ using Football.Engine;
 using Football.Audio;
 using Football.Presentation;
 using Football.Procedural;
+using Football.Modes;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
@@ -109,11 +110,11 @@ public class MatchBootstrapper : MonoBehaviour
         // 4. Build TV Broadcast HUD & 2D Minimap Radar
         SetupBroadcastUI();
 
-        // 5. Spawn Team 1 (Argentina - Human Controlled)
+        // 5. Spawn Team 1 (Argentina - Player 1: WASD / Gamepad 1)
         var team1Players = SpawnTeam(1, "Argentina", new Color(0.45f, 0.72f, 1.0f), Color.white, new Color(0.95f, 0.9f, 0.1f), FormationType.Formation_4_3_3, true);
 
-        // 6. Spawn Team 2 (France - AI Opponent)
-        var team2Players = SpawnTeam(2, "France", new Color(0.88f, 0.12f, 0.16f), new Color(0.06f, 0.10f, 0.24f), new Color(0.95f, 0.45f, 0.10f), FormationType.Formation_4_3_3, false);
+        // 6. Spawn Team 2 (France - Player 2 / AI: Arrows / Gamepad 2)
+        var team2Players = SpawnTeam(2, "France", new Color(0.88f, 0.12f, 0.16f), new Color(0.06f, 0.10f, 0.24f), new Color(0.95f, 0.45f, 0.10f), FormationType.Formation_4_3_3, true);
 
         // 7. Initialize Match Engine and Audio
         SetupMatchSystems(team1Players, team2Players, ball);
@@ -467,7 +468,9 @@ public class MatchBootstrapper : MonoBehaviour
 
         if (isHumanTeam && defaultHumanPlayer != null)
         {
-            var marker = CreatePlayerIndicator(defaultHumanPlayer.transform, "10 MESSI");
+            string startName = (teamId == 1) ? "10 MESSI" : "10 MBAPPE";
+            Color markerCol = (teamId == 1) ? new Color(0.0f, 1.0f, 0.45f) : new Color(1.0f, 0.35f, 0.1f);
+            var marker = CreatePlayerIndicator(defaultHumanPlayer.transform, startName, markerCol);
             switcher.overheadMarker = marker;
             switcher.SwitchToPlayer(defaultHumanPlayer);
         }
@@ -1124,11 +1127,11 @@ public class MatchBootstrapper : MonoBehaviour
         return new PlayerLegJoints { hip = legRoot.transform, knee = kneeJoint.transform, ankle = ankleJoint.transform };
     }
 
-    private PlayerOverheadMarker CreatePlayerIndicator(Transform parent, string displayName = "10 MESSI")
+    private PlayerOverheadMarker CreatePlayerIndicator(Transform parent, string displayName = "10 MESSI", Color? markerColor = null)
     {
         GameObject markerObj = new GameObject("PlayerOverheadMarker");
         var marker = markerObj.AddComponent<PlayerOverheadMarker>();
-        marker.Initialize(parent, displayName);
+        marker.Initialize(parent, displayName, markerColor);
         return marker;
     }
 
@@ -1273,6 +1276,9 @@ public class MatchBootstrapper : MonoBehaviour
         // 4. Crowd Audio & Commentary
         systemsRoot.AddComponent<CrowdAudioManager>();
         systemsRoot.AddComponent<FootballCommentarySystem>();
+
+        // 5. Penalty Shootout Mode
+        systemsRoot.AddComponent<PenaltyShootoutMode>();
     }
 
     private static Material CreateLitMaterial(Color color, float smoothness = 0.5f, Texture2D normalMap = null, float metallic = 0.0f)

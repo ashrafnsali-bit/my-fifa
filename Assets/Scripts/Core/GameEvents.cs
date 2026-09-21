@@ -69,6 +69,7 @@ namespace Football.Core
 
         // Gameplay actions & Audio/Commentary triggers
         public static event Action<int, ShotType, float> OnShotTaken; // teamId, type, power
+        public static event Action<Transform, float> OnPowerShotInitiated; // shooterTransform, power
         public static event Action<int, PassType> OnPassCompleted; // teamId, passType
         public static event Action<int, Transform> OnPassInitiated; // teamId, targetTeammate
         public static event Action<Transform> OnRequestPlayerSwitch; // targetPlayerTransform
@@ -99,6 +100,7 @@ namespace Football.Core
         public static void TriggerSetPieceInitiated(MatchState state, Vector3 pos, int teamId) => OnSetPieceInitiated?.Invoke(state, pos, teamId);
 
         public static void TriggerShotTaken(int teamId, ShotType type, float power) => OnShotTaken?.Invoke(teamId, type, power);
+        public static void TriggerPowerShotInitiated(Transform shooter, float power) => OnPowerShotInitiated?.Invoke(shooter, power);
         public static void TriggerPassCompleted(int teamId, PassType passType) => OnPassCompleted?.Invoke(teamId, passType);
         public static void TriggerPassInitiated(int teamId, Transform targetTeammate) => OnPassInitiated?.Invoke(teamId, targetTeammate);
         public static void TriggerRequestPlayerSwitch(Transform target) => OnRequestPlayerSwitch?.Invoke(target);

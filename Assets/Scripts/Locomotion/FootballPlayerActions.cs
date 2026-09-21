@@ -209,6 +209,11 @@ namespace Football.Locomotion
                 GameEvents.TriggerMatchStateChanged(MatchState.InPlay);
             }
 
+            if (type == ShotType.Power || power01 > 0.72f)
+            {
+                GameEvents.TriggerPowerShotInitiated(transform, power01);
+            }
+
             GameEvents.TriggerShotTaken(runtimeState.teamId, type, power01);
         }
 

@@ -32,10 +32,12 @@ public class TeamPlayerSwitcher : MonoBehaviour
     private float intendedReceiverTimer = 0f;
 
     public static TeamPlayerSwitcher Instance { get; private set; }
+    public static TeamPlayerSwitcher Team2Instance { get; private set; }
 
     private void Awake()
     {
-        if (Instance == null) Instance = this;
+        if (humanTeamId == 1) Instance = this;
+        else if (humanTeamId == 2) Team2Instance = this;
     }
 
     private void OnEnable()
@@ -97,11 +99,23 @@ public class TeamPlayerSwitcher : MonoBehaviour
         float dt = Time.deltaTime;
         var ball = FootballBall.Instance;
 
-        // 1. Manual switch key (Q on Keyboard, LB / Left Shoulder on Gamepad)
+        // 1. Manual switch key (P1: Q / Gamepad 1 LB | P2: Right Ctrl / Keypad 0 / Gamepad 2 LB)
         var keyboard = Keyboard.current;
-        var gamepad = Gamepad.current;
-        bool manualSwitch = (keyboard != null && keyboard.qKey.wasPressedThisFrame) ||
-                            (gamepad != null && gamepad.leftShoulder.wasPressedThisFrame);
+        var gamepad = (humanTeamId == 1) ? (Gamepad.all.Count > 0 ? Gamepad.all[0] : null) : (Gamepad.all.Count > 1 ? Gamepad.all[1] : null);
+        
+        bool manualSwitch = false;
+        if (humanTeamId == 1)
+        {
+            manualSwitch = (keyboard != null && keyboard.qKey.wasPressedThisFrame) ||
+                           (gamepad != null && gamepad.leftShoulder.wasPressedThisFrame) ||
+                           Input.GetKeyDown(KeyCode.Q);
+        }
+        else
+        {
+            manualSwitch = (keyboard != null && (keyboard.rightCtrlKey.wasPressedThisFrame || keyboard.numpad0Key.wasPressedThisFrame)) ||
+                           (gamepad != null && gamepad.leftShoulder.wasPressedThisFrame) ||
+                           Input.GetKeyDown(KeyCode.RightControl) || Input.GetKeyDown(KeyCode.Keypad0);
+        }
 
         if (manualSwitch && ball != null)
         {
@@ -264,6 +278,7 @@ public class TeamPlayerSwitcher : MonoBehaviour
 
         var nextInput = newPlayer.GetComponent<FootballInputHandler>();
         if (nextInput == null) nextInput = newPlayer.gameObject.AddComponent<FootballInputHandler>();
+        nextInput.playerIndex = humanTeamId;
         nextInput.isHumanControlled = true;
 
         var nextAI = newPlayer.GetComponent<FootballAIPlayer>();
