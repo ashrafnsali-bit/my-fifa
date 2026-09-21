@@ -479,7 +479,8 @@ public class MatchBootstrapper : MonoBehaviour
         var tactics = teamRoot.AddComponent<TeamTacticsController>();
         tactics.teamId = teamId;
         tactics.formation = formation;
-        tactics.difficultySettings = AIDifficultySettings.GetPreset(DifficultyLevel.Professional);
+        tactics.mentality = TeamMentality.Attacking;
+        tactics.difficultySettings = AIDifficultySettings.GetPreset(DifficultyLevel.WorldClass);
         tactics.teamPlayers = aiPlayerList;
 
         foreach (var ai in aiPlayerList)

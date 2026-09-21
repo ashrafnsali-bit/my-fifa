@@ -21,7 +21,7 @@ namespace Football.Tactics
         [Header("Team Identity")]
         public int teamId = 2; // Default to Team 2 (AI opponent)
         public FormationType formation = FormationType.Formation_4_3_3;
-        public TeamMentality mentality = TeamMentality.Balanced;
+        public TeamMentality mentality = TeamMentality.Attacking;
         public AIDifficultySettings difficultySettings;
 
         [Header("Tactical Dimensions")]
@@ -40,7 +40,7 @@ namespace Football.Tactics
         {
             if (difficultySettings == null)
             {
-                difficultySettings = AIDifficultySettings.GetPreset(DifficultyLevel.Professional);
+                difficultySettings = AIDifficultySettings.GetPreset(DifficultyLevel.WorldClass);
             }
             formationSlots = FormationData.GetFormationSlots(formation);
         }

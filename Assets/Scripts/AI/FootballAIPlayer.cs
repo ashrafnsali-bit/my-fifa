@@ -263,61 +263,54 @@ namespace Football.Tactics
             Vector3 targetGoal = PitchConstants.GetTargetGoalCenter(runtimeState.teamId);
             float distToGoal = Vector3.Distance(transform.position, targetGoal);
 
-            // 1. SHOOTING: When in shooting range (< 28m)
-            if (distToGoal < 28.0f)
+            // 1. RELENTLESS CLINICAL SHOOTING (Within 34m of opponent goal):
+            // AI plays aggressively to score goals!
+            if (distToGoal < 34.0f)
             {
-                decisionTimer -= Time.deltaTime;
-                if (decisionTimer <= 0f)
-                {
-                    decisionTimer = Random.Range(0.28f, 0.50f);
-                    currentAIState = AIState.Shooting;
+                currentAIState = AIState.Shooting;
 
-                    // Target left or right side of goal net
-                    Vector3 aimPost = targetGoal + (Random.value > 0.5f ? Vector3.right * 2.8f : Vector3.left * 2.8f);
-                    Vector3 aim = (aimPost - transform.position).normalized;
-                    aim.y = 0f;
+                // Target post corners (aiming left post or right post for unstoppable finishes)
+                Vector3 leftPost = targetGoal + Vector3.right * 3.0f;
+                Vector3 rightPost = targetGoal - Vector3.right * 3.0f;
+                Vector3 chosenPost = (Random.value > 0.5f) ? leftPost : rightPost;
 
-                    float power = Mathf.Clamp(distToGoal / 28f * 0.85f + 0.35f, 0.55f, 0.95f);
-                    actions.ExecuteShot(distToGoal < 16f ? ShotType.Finesse : ShotType.Standard, aim, power);
-                    return;
-                }
+                Vector3 aim = (chosenPost - transform.position).normalized;
+                aim.y = 0f;
+
+                // High lethal shot power to beat the goalkeeper
+                float power = Mathf.Clamp(0.72f + (distToGoal / 34f) * 0.25f, 0.65f, 0.98f);
+                ShotType sType = distToGoal < 16f ? ShotType.Finesse : (distToGoal > 24f ? ShotType.Power : ShotType.Standard);
+
+                actions.ExecuteShot(sType, aim, power);
+                return;
             }
 
-            // 2. PASSING: Look for unmarked forward teammates
-            decisionTimer -= Time.deltaTime;
-            if (decisionTimer <= 0f)
-            {
-                decisionTimer = Random.Range(0.35f, 0.70f);
-                var bestPassTarget = FindBestPassOption();
-                bool underPressure = IsOpponentPressing();
-
-                if (bestPassTarget != null && (underPressure || (distToGoal > 30.0f && Random.value < 0.40f)))
-                {
-                    currentAIState = AIState.Passing;
-                    Vector3 passDir = (bestPassTarget.position - transform.position).normalized;
-                    passDir.y = 0f;
-                    actions.ExecutePass(PassType.Ground, passDir, 0.72f, bestPassTarget);
-                    return;
-                }
-            }
-
-            // 3. AGGRESSIVE DRIBBLE TOWARDS OPPONENT GOAL:
-            currentAIState = AIState.DribblingSpace;
+            // 2. FORWARD ATTACKING RUN (Sprint directly towards opponent goal):
             Vector3 forwardDribbleDir = (targetGoal - transform.position).normalized;
             forwardDribbleDir.y = 0f;
 
-            // Evade nearby tackling opponents
+            // Evade nearby tackling defenders or slip a forward through pass
             var pressingOpponent = GetNearestOpponent();
-            if (pressingOpponent != null && Vector3.Distance(transform.position, pressingOpponent.transform.position) < 2.4f)
+            if (pressingOpponent != null && Vector3.Distance(transform.position, pressingOpponent.transform.position) < 2.2f)
             {
+                var forwardPassTarget = FindBestPassOption();
+                if (forwardPassTarget != null && Vector3.Distance(forwardPassTarget.position, targetGoal) < distToGoal)
+                {
+                    currentAIState = AIState.Passing;
+                    Vector3 passDir = (forwardPassTarget.position - transform.position).normalized;
+                    passDir.y = 0f;
+                    actions.ExecutePass(PassType.Ground, passDir, 0.78f, forwardPassTarget);
+                    return;
+                }
+
                 Vector3 awayFromOpp = (transform.position - pressingOpponent.transform.position).normalized;
                 awayFromOpp.y = 0f;
-                forwardDribbleDir = (forwardDribbleDir * 1.4f + awayFromOpp).normalized;
+                forwardDribbleDir = (forwardDribbleDir * 1.5f + awayFromOpp).normalized;
             }
 
-            // Sprint when clear path is available
-            bool sprint = distToGoal > 16.0f && !IsOpponentPressing();
-            locomotion.SetWorldMovementInput(forwardDribbleDir, sprint);
+            // Always drive and sprint directly on goal!
+            currentAIState = AIState.DribblingSpace;
+            locomotion.SetWorldMovementInput(forwardDribbleDir, true);
         }
 
         private PlayerRuntimeState GetNearestOpponent()
