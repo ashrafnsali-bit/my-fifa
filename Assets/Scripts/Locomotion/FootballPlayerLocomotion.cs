@@ -465,8 +465,10 @@ namespace Football.Locomotion
                     faceGoalDir.y = 0f;
                     if (faceGoalDir.sqrMagnitude > 0.01f)
                     {
+                        float agility = runtimeState.attributes != null ? runtimeState.attributes.agility : 75f;
+                        float rotSpeed = turnSpeed * (agility / 70f) * 3.5f;
                         Quaternion targetRot = Quaternion.LookRotation(faceGoalDir.normalized, Vector3.up);
-                        rb.MoveRotation(Quaternion.RotateTowards(rb.rotation, targetRot, dynamicTurnSpeed * 3.5f * dt));
+                        rb.MoveRotation(Quaternion.RotateTowards(rb.rotation, targetRot, rotSpeed * dt));
                     }
                 }
 
