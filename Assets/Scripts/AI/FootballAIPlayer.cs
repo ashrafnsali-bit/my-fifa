@@ -77,51 +77,18 @@ namespace Football.Tactics
                 return;
             }
 
-            // 3. Human team (Team 1) in possession: AI teammate dribbles forward into space
-            // so play continues smoothly until user switches to him or presses buttons!
-            if (runtimeState.teamId == 1 && runtimeState.hasBall)
-            {
-                currentAIState = AIState.DribblingSpace;
-                Vector3 targetGoal = PitchConstants.GetTargetGoalCenter(runtimeState.teamId);
-                Vector3 dribbleDir = (targetGoal - transform.position).normalized;
-                dribbleDir.y = 0f;
-                locomotion.SetWorldMovementInput(dribbleDir, false);
-                return;
-            }
-
-            decisionTimer -= Time.deltaTime;
-            if (decisionTimer <= 0f)
-            {
-                float latency = tacticsController != null && tacticsController.difficultySettings != null
-                    ? tacticsController.difficultySettings.reactionLatency
-                    : 0.2f;
-                decisionTimer = latency;
-
-                EvaluateTacticalDecision();
-            }
-        }
-
-        private void EvaluateTacticalDecision()
-        {
             var ball = FootballBall.Instance;
             if (ball == null) return;
 
-            // 1. Goalkeeper branch (also called every frame in Update)
-            if (runtimeState.attributes.position == PlayerPosition.GK)
-            {
-                ExecuteGoalkeeperBehavior(ball);
-                return;
-            }
-
-            // 2. In-Possession branch
+            // 3. Continuous Tactical Execution every frame for both attacking and defending!
             if (runtimeState.hasBall)
             {
                 ExecuteInPossessionBehavior(ball);
-                return;
             }
-
-            // 3. Out-of-Possession branch
-            ExecuteOutOfPossessionBehavior(ball);
+            else
+            {
+                ExecuteOutOfPossessionBehavior(ball);
+            }
         }
 
         private void ExecuteGoalkeeperBehavior(FootballBall ball)
@@ -296,37 +263,80 @@ namespace Football.Tactics
             Vector3 targetGoal = PitchConstants.GetTargetGoalCenter(runtimeState.teamId);
             float distToGoal = Vector3.Distance(transform.position, targetGoal);
 
-            // Shoot if within scoring range (< 26m)
-            if (distToGoal < 26.0f)
+            // 1. SHOOTING: When in shooting range (< 28m)
+            if (distToGoal < 28.0f)
             {
-                currentAIState = AIState.Shooting;
-                locomotion.SetMovementInput(Vector2.zero, false);
+                decisionTimer -= Time.deltaTime;
+                if (decisionTimer <= 0f)
+                {
+                    decisionTimer = Random.Range(0.28f, 0.50f);
+                    currentAIState = AIState.Shooting;
 
-                Vector3 aim = (targetGoal - transform.position).normalized;
-                // Add slight inaccuracy based on difficulty
-                float errorAngle = tacticsController != null ? (1f - tacticsController.difficultySettings.shotAccuracy) * 12f : 3f;
-                aim = Quaternion.Euler(0f, Random.Range(-errorAngle, errorAngle), 0f) * aim;
+                    // Target left or right side of goal net
+                    Vector3 aimPost = targetGoal + (Random.value > 0.5f ? Vector3.right * 2.8f : Vector3.left * 2.8f);
+                    Vector3 aim = (aimPost - transform.position).normalized;
+                    aim.y = 0f;
 
-                actions.ExecuteShot(distToGoal < 16f ? ShotType.Standard : ShotType.Finesse, aim, Random.Range(0.6f, 0.95f));
-                return;
+                    float power = Mathf.Clamp(distToGoal / 28f * 0.85f + 0.35f, 0.55f, 0.95f);
+                    actions.ExecuteShot(distToGoal < 16f ? ShotType.Finesse : ShotType.Standard, aim, power);
+                    return;
+                }
             }
 
-            // Evaluate passing to open teammate of same team
-            var bestPassTarget = FindBestPassOption();
-            bool underPressure = IsOpponentPressing();
-            if (bestPassTarget != null && (underPressure || Random.value < 0.80f))
+            // 2. PASSING: Look for unmarked forward teammates
+            decisionTimer -= Time.deltaTime;
+            if (decisionTimer <= 0f)
             {
-                currentAIState = AIState.Passing;
-                Vector3 passDir = (bestPassTarget.position - transform.position).normalized;
-                actions.ExecutePass(PassType.Ground, passDir, 0.65f, bestPassTarget);
-                return;
+                decisionTimer = Random.Range(0.35f, 0.70f);
+                var bestPassTarget = FindBestPassOption();
+                bool underPressure = IsOpponentPressing();
+
+                if (bestPassTarget != null && (underPressure || (distToGoal > 30.0f && Random.value < 0.40f)))
+                {
+                    currentAIState = AIState.Passing;
+                    Vector3 passDir = (bestPassTarget.position - transform.position).normalized;
+                    passDir.y = 0f;
+                    actions.ExecutePass(PassType.Ground, passDir, 0.72f, bestPassTarget);
+                    return;
+                }
             }
 
-            // Otherwise dribble into open space towards opponent goal
+            // 3. AGGRESSIVE DRIBBLE TOWARDS OPPONENT GOAL:
             currentAIState = AIState.DribblingSpace;
             Vector3 forwardDribbleDir = (targetGoal - transform.position).normalized;
-            Vector2 dribbleInput = new Vector2(forwardDribbleDir.x, forwardDribbleDir.z);
-            locomotion.SetMovementInput(dribbleInput, false);
+            forwardDribbleDir.y = 0f;
+
+            // Evade nearby tackling opponents
+            var pressingOpponent = GetNearestOpponent();
+            if (pressingOpponent != null && Vector3.Distance(transform.position, pressingOpponent.transform.position) < 2.4f)
+            {
+                Vector3 awayFromOpp = (transform.position - pressingOpponent.transform.position).normalized;
+                awayFromOpp.y = 0f;
+                forwardDribbleDir = (forwardDribbleDir * 1.4f + awayFromOpp).normalized;
+            }
+
+            // Sprint when clear path is available
+            bool sprint = distToGoal > 16.0f && !IsOpponentPressing();
+            locomotion.SetWorldMovementInput(forwardDribbleDir, sprint);
+        }
+
+        private PlayerRuntimeState GetNearestOpponent()
+        {
+            var players = FindObjectsByType<PlayerRuntimeState>(FindObjectsSortMode.None);
+            PlayerRuntimeState nearest = null;
+            float minDist = float.MaxValue;
+            for (int i = 0; i < players.Length; i++)
+            {
+                var p = players[i];
+                if (p == null || p.teamId == runtimeState.teamId || p.isSentOff) continue;
+                float d = Vector3.Distance(transform.position, p.transform.position);
+                if (d < minDist)
+                {
+                    minDist = d;
+                    nearest = p;
+                }
+            }
+            return nearest;
         }
 
         private bool IsOpponentPressing()
@@ -360,7 +370,6 @@ namespace Football.Tactics
 
         private static bool IsOpponentGoalkeeperHoldingBall(int myTeamId)
         {
-            // Check if any goalkeeper from the OPPOSING team is holding the ball
             var players = FindObjectsByType<PlayerRuntimeState>(FindObjectsSortMode.None);
             foreach (var p in players)
             {
@@ -372,28 +381,27 @@ namespace Football.Tactics
 
         private void ExecuteOutOfPossessionBehavior(FootballBall ball)
         {
-            // RULE: Opponents MUST NOT attack or press the goalkeeper while he holds the ball!
-            // All players must retreat to their tactical anchor positions.
+            // Goalkeeper immunity: return to anchor if opposing GK holds ball
             if (IsOpponentGoalkeeperHoldingBall(runtimeState.teamId))
             {
                 currentAIState = AIState.HoldingAnchor;
                 Vector3 toAnchor = tacticalAnchor - transform.position;
+                toAnchor.y = 0f;
                 float dist = toAnchor.magnitude;
                 if (dist > 1.2f)
                 {
-                    Vector2 anchorInput = new Vector2(toAnchor.x, toAnchor.z).normalized;
-                    locomotion.SetMovementInput(anchorInput, dist > 6.0f);
+                    locomotion.SetWorldMovementInput(toAnchor.normalized, dist > 6.0f);
                 }
                 else
                 {
-                    locomotion.SetMovementInput(Vector2.zero, false);
+                    locomotion.SetWorldMovementInput(Vector3.zero, false);
                 }
                 return;
             }
 
             float distToBall = Vector3.Distance(transform.position, ball.transform.position);
 
-            // 1. OFFENSIVE SUPPORT: If a teammate has possession, move to support and create passing angles
+            // 1. OFFENSIVE SUPPORT: If a teammate has possession, advance into open space to support
             if (DoesTeammateHaveBall())
             {
                 bool isPrimarySupport = (tacticsController != null && tacticsController.closestPlayerToBall == this);
@@ -404,18 +412,18 @@ namespace Football.Tactics
                     currentAIState = AIState.HoldingAnchor;
                     Vector3 ballPos = ball.transform.position;
                     Vector3 targetGoal = PitchConstants.GetTargetGoalCenter(runtimeState.teamId);
-                    Vector3 supportPos = ballPos + (targetGoal - ballPos).normalized * 5.0f + (transform.position - ballPos).normalized * 5.0f;
-                    supportPos.y = transform.position.y;
+                    Vector3 supportPos = ballPos + (targetGoal - ballPos).normalized * 6.5f + (transform.position - ballPos).normalized * 4.5f;
+                    supportPos.y = 0f;
 
                     Vector3 toSupport = supportPos - transform.position;
+                    toSupport.y = 0f;
                     if (toSupport.magnitude > 0.8f)
                     {
-                        Vector2 moveInput = new Vector2(toSupport.x, toSupport.z).normalized;
-                        locomotion.SetMovementInput(moveInput, toSupport.magnitude > 3.5f);
+                        locomotion.SetWorldMovementInput(toSupport.normalized, toSupport.magnitude > 4.0f);
                     }
                     else
                     {
-                        locomotion.SetMovementInput(Vector2.zero, false);
+                        locomotion.SetWorldMovementInput(Vector3.zero, false);
                     }
                     return;
                 }
@@ -423,45 +431,44 @@ namespace Football.Tactics
                 {
                     currentAIState = AIState.HoldingAnchor;
                     Vector3 ballPos = ball.transform.position;
-                    Vector3 supportPos = ballPos + (transform.position - ballPos).normalized * 10.0f;
-                    supportPos.y = transform.position.y;
+                    Vector3 supportPos = ballPos + (transform.position - ballPos).normalized * 9.0f;
+                    supportPos.y = 0f;
 
                     Vector3 toSupport = supportPos - transform.position;
-                    if (toSupport.magnitude > 1.2f)
+                    toSupport.y = 0f;
+                    if (toSupport.magnitude > 1.0f)
                     {
-                        Vector2 moveInput = new Vector2(toSupport.x, toSupport.z).normalized;
-                        locomotion.SetMovementInput(moveInput, false);
+                        locomotion.SetWorldMovementInput(toSupport.normalized, false);
                     }
                     else
                     {
-                        locomotion.SetMovementInput(Vector2.zero, false);
+                        locomotion.SetWorldMovementInput(Vector3.zero, false);
                     }
                     return;
                 }
             }
 
-            // 2. DEFENSIVE PRESSING & MARKING: At least 2 defending players actively contest the ball
-            bool isFirstPresser = (tacticsController != null && tacticsController.closestPlayerToBall == this);
+            // 2. DEFENSIVE PRESSING & TACKLING: Relentlessly chase the ball carrier!
+            bool isFirstPresser = (tacticsController != null && tacticsController.closestPlayerToBall == this) || distToBall < 5.0f;
             bool isSecondPresser = (tacticsController != null && tacticsController.secondClosestPlayerToBall == this);
-            bool isPresser = isFirstPresser;
 
-            if (isPresser)
+            if (isFirstPresser)
             {
                 currentAIState = AIState.PressingBall;
                 Vector3 toBall = ball.transform.position - transform.position;
-                Vector2 pressInput = new Vector2(toBall.x, toBall.z).normalized;
+                toBall.y = 0f;
 
-                bool shouldSprint = distToBall > 2.5f;
-                locomotion.SetMovementInput(pressInput, shouldSprint);
+                // Full sprint to win the ball!
+                locomotion.SetWorldMovementInput(toBall.normalized, distToBall > 1.8f);
 
-                // If within tackling reach
+                // Tackle when within range
                 if (distToBall < 1.6f)
                 {
-                    if (Random.value < 0.8f)
+                    if (Random.value < 0.75f)
                     {
                         actions.ExecuteStandingTackle();
                     }
-                    else if (distToBall > 1.2f)
+                    else if (distToBall > 1.1f && distToBall < 1.8f)
                     {
                         actions.ExecuteSlideTackle();
                     }
@@ -469,22 +476,22 @@ namespace Football.Tactics
             }
             else if (isSecondPresser)
             {
-                // Secondary presser / cover: marks space and cuts off passing lanes 5-8m from ball
+                // Secondary cover: cut passing lane towards goal
                 currentAIState = AIState.PressingBall;
                 Vector3 ballPos = ball.transform.position;
                 Vector3 ownGoal = PitchConstants.GetDefendingGoalCenter(runtimeState.teamId);
-                Vector3 coverPos = ballPos + (ownGoal - ballPos).normalized * 4.5f + (transform.position - ballPos).normalized * 3.5f;
-                coverPos.y = transform.position.y;
+                Vector3 coverPos = ballPos + (ownGoal - ballPos).normalized * 4.5f;
+                coverPos.y = 0f;
 
                 Vector3 toCover = coverPos - transform.position;
+                toCover.y = 0f;
                 if (toCover.magnitude > 0.8f)
                 {
-                    Vector2 coverInput = new Vector2(toCover.x, toCover.z).normalized;
-                    locomotion.SetMovementInput(coverInput, toCover.magnitude > 3.0f);
+                    locomotion.SetWorldMovementInput(toCover.normalized, toCover.magnitude > 3.5f);
                 }
                 else
                 {
-                    locomotion.SetMovementInput(Vector2.zero, false);
+                    locomotion.SetWorldMovementInput(Vector3.zero, false);
                 }
             }
             else
@@ -492,16 +499,16 @@ namespace Football.Tactics
                 // Hold tactical anchor
                 currentAIState = AIState.HoldingAnchor;
                 Vector3 toAnchor = tacticalAnchor - transform.position;
+                toAnchor.y = 0f;
                 float dist = toAnchor.magnitude;
 
                 if (dist > 1.2f)
                 {
-                    Vector2 anchorInput = new Vector2(toAnchor.x, toAnchor.z).normalized;
-                    locomotion.SetMovementInput(anchorInput, dist > 6.0f);
+                    locomotion.SetWorldMovementInput(toAnchor.normalized, dist > 6.0f);
                 }
                 else
                 {
-                    locomotion.SetMovementInput(Vector2.zero, false);
+                    locomotion.SetWorldMovementInput(Vector3.zero, false);
                 }
             }
         }

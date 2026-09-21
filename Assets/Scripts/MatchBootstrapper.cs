@@ -110,11 +110,11 @@ public class MatchBootstrapper : MonoBehaviour
         // 4. Build TV Broadcast HUD & 2D Minimap Radar
         SetupBroadcastUI();
 
-        // 5. Spawn Team 1 (Argentina - Player 1: WASD / Gamepad 1)
+        // 5. Spawn Team 1 (Argentina - Player 1: Human Controlled)
         var team1Players = SpawnTeam(1, "Argentina", new Color(0.45f, 0.72f, 1.0f), Color.white, new Color(0.95f, 0.9f, 0.1f), FormationType.Formation_4_3_3, true);
 
-        // 6. Spawn Team 2 (France - Player 2 / AI: Arrows / Gamepad 2)
-        var team2Players = SpawnTeam(2, "France", new Color(0.88f, 0.12f, 0.16f), new Color(0.06f, 0.10f, 0.24f), new Color(0.95f, 0.45f, 0.10f), FormationType.Formation_4_3_3, true);
+        // 6. Spawn Team 2 (France - Dynamic AI Opponent / P2 Local)
+        var team2Players = SpawnTeam(2, "France", new Color(0.88f, 0.12f, 0.16f), new Color(0.06f, 0.10f, 0.24f), new Color(0.95f, 0.45f, 0.10f), FormationType.Formation_4_3_3, false);
 
         // 7. Initialize Match Engine and Audio
         SetupMatchSystems(team1Players, team2Players, ball);
