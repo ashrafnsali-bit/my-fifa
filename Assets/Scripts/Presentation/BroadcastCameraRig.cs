@@ -253,7 +253,8 @@ namespace Football.Presentation
 
             // Camera sits on the sideline (negative X), centred on ball's Z position
             float targetX = ballPos.x - activeDistance;
-            float targetZ = ballPos.z;
+            float maxZClamp = PitchConstants.HalfLength * 0.82f;
+            float targetZ = Mathf.Clamp(ballPos.z, -maxZClamp, maxZClamp);
             Vector3 desiredCamPos = new Vector3(targetX, activeHeight, targetZ);
 
             // Clamp camera so it never goes below 2.0m above the ground

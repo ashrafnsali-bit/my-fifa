@@ -252,20 +252,21 @@ namespace Football.Locomotion
             else if (targetMoveDirection.sqrMagnitude > 0.01f)
             {
                 Quaternion targetRot = Quaternion.LookRotation(targetMoveDirection, Vector3.up);
-                // Use Slerp interpolation for authentic athletic weight transfer
-                rb.MoveRotation(Quaternion.RotateTowards(rb.rotation, targetRot, dynamicTurnSpeed * dt));
+                // Smooth athletic Slerp interpolation with momentum transfer (eliminates jitter/snapping)
+                float slerpRate = Mathf.Clamp(14.0f * (agilityAttr / 70f), 8.0f, 24.0f);
+                rb.MoveRotation(Quaternion.Slerp(rb.rotation, targetRot, slerpRate * dt));
             }
             else if (runtimeState.hasBall && !isGK)
             {
                 // When receiving or controlling the ball without active manual movement input:
-                // Instantly orient body towards the opponent's attacking goal!
+                // Smoothly orient body towards the opponent's attacking goal!
                 Vector3 targetGoal = PitchConstants.GetTargetGoalCenter(runtimeState.teamId);
                 Vector3 faceGoalDir = targetGoal - transform.position;
                 faceGoalDir.y = 0f;
                 if (faceGoalDir.sqrMagnitude > 0.01f)
                 {
                     Quaternion targetRot = Quaternion.LookRotation(faceGoalDir.normalized, Vector3.up);
-                    rb.MoveRotation(Quaternion.RotateTowards(rb.rotation, targetRot, dynamicTurnSpeed * 1.8f * dt));
+                    rb.MoveRotation(Quaternion.Slerp(rb.rotation, targetRot, 10.0f * dt));
                 }
             }
 
@@ -465,10 +466,8 @@ namespace Football.Locomotion
                     faceGoalDir.y = 0f;
                     if (faceGoalDir.sqrMagnitude > 0.01f)
                     {
-                        float agility = runtimeState.attributes != null ? runtimeState.attributes.agility : 75f;
-                        float rotSpeed = turnSpeed * (agility / 70f) * 3.5f;
                         Quaternion targetRot = Quaternion.LookRotation(faceGoalDir.normalized, Vector3.up);
-                        rb.MoveRotation(Quaternion.RotateTowards(rb.rotation, targetRot, rotSpeed * dt));
+                        rb.MoveRotation(Quaternion.Slerp(rb.rotation, targetRot, 14.0f * dt));
                     }
                 }
 
@@ -476,7 +475,7 @@ namespace Football.Locomotion
                 runtimeState.currentState = MovementState.Dribbling;
 
                 // Close-control touch: natural stride distance depending on sprint vs jog
-                float dynamicPushOffset = isSprinting ? 1.15f : dribblePushOffset;
+                float dynamicPushOffset = isSprinting ? 1.10f : dribblePushOffset;
                 Vector3 desiredBallPos = transform.position + transform.forward * dynamicPushOffset;
                 desiredBallPos.y = ball.ballRadius;
 
@@ -487,8 +486,8 @@ namespace Football.Locomotion
                 {
                     // Touch Dribble Physics: Guide ball smoothly ahead with athletic touches
                     float touchSpeed = Mathf.Max(currentVelocity.magnitude, 2.5f);
-                    Vector3 touchVel = (transform.forward * touchSpeed + ballCorrection * 5.0f);
-                    ball.BallRigidbody.linearVelocity = Vector3.Lerp(ball.BallRigidbody.linearVelocity, touchVel, (isSprinting ? 7.5f : 12.0f) * dt);
+                    Vector3 touchVel = (transform.forward * touchSpeed + ballCorrection * 7.5f);
+                    ball.BallRigidbody.linearVelocity = Vector3.Lerp(ball.BallRigidbody.linearVelocity, touchVel, (isSprinting ? 14.0f : 18.0f) * dt);
                 }
                 else
                 {
