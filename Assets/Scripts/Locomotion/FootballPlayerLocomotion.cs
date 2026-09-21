@@ -255,6 +255,19 @@ namespace Football.Locomotion
                 // Use Slerp interpolation for authentic athletic weight transfer
                 rb.MoveRotation(Quaternion.RotateTowards(rb.rotation, targetRot, dynamicTurnSpeed * dt));
             }
+            else if (runtimeState.hasBall && !isGK)
+            {
+                // When receiving or controlling the ball without active manual movement input:
+                // Instantly orient body towards the opponent's attacking goal!
+                Vector3 targetGoal = PitchConstants.GetTargetGoalCenter(runtimeState.teamId);
+                Vector3 faceGoalDir = targetGoal - transform.position;
+                faceGoalDir.y = 0f;
+                if (faceGoalDir.sqrMagnitude > 0.01f)
+                {
+                    Quaternion targetRot = Quaternion.LookRotation(faceGoalDir.normalized, Vector3.up);
+                    rb.MoveRotation(Quaternion.RotateTowards(rb.rotation, targetRot, dynamicTurnSpeed * 1.8f * dt));
+                }
+            }
 
             // 4. Physical Shoulder-to-Shoulder Jostling when running alongside opponent
             HandleShoulderJostling(strengthAttr, dt);
@@ -445,6 +458,18 @@ namespace Football.Locomotion
 
             if (dist <= dribbleRadius)
             {
+                if (!runtimeState.hasBall && !isGK)
+                {
+                    Vector3 targetGoal = PitchConstants.GetTargetGoalCenter(runtimeState.teamId);
+                    Vector3 faceGoalDir = targetGoal - transform.position;
+                    faceGoalDir.y = 0f;
+                    if (faceGoalDir.sqrMagnitude > 0.01f)
+                    {
+                        Quaternion targetRot = Quaternion.LookRotation(faceGoalDir.normalized, Vector3.up);
+                        rb.MoveRotation(Quaternion.RotateTowards(rb.rotation, targetRot, dynamicTurnSpeed * 3.5f * dt));
+                    }
+                }
+
                 runtimeState.hasBall = true;
                 runtimeState.currentState = MovementState.Dribbling;
 
