@@ -263,52 +263,57 @@ namespace Football.Tactics
             Vector3 targetGoal = PitchConstants.GetTargetGoalCenter(runtimeState.teamId);
             float distToGoal = Vector3.Distance(transform.position, targetGoal);
 
-            // 1. RELENTLESS CLINICAL SHOOTING (Within 34m of opponent goal):
-            // AI plays aggressively to score goals!
-            if (distToGoal < 34.0f)
+            // 1. RELENTLESS CLINICAL SHOOTING (Within 38m of opponent goal):
+            // AI actively hunts goals with unstoppable strikes!
+            if (distToGoal < 38.0f)
             {
                 currentAIState = AIState.Shooting;
 
                 // Target post corners (aiming left post or right post for unstoppable finishes)
-                Vector3 leftPost = targetGoal + Vector3.right * 3.0f;
-                Vector3 rightPost = targetGoal - Vector3.right * 3.0f;
+                Vector3 leftPost = targetGoal + Vector3.right * 3.1f;
+                Vector3 rightPost = targetGoal - Vector3.right * 3.1f;
                 Vector3 chosenPost = (Random.value > 0.5f) ? leftPost : rightPost;
 
                 Vector3 aim = (chosenPost - transform.position).normalized;
                 aim.y = 0f;
 
                 // High lethal shot power to beat the goalkeeper
-                float power = Mathf.Clamp(0.72f + (distToGoal / 34f) * 0.25f, 0.65f, 0.98f);
-                ShotType sType = distToGoal < 16f ? ShotType.Finesse : (distToGoal > 24f ? ShotType.Power : ShotType.Standard);
+                float power = Mathf.Clamp(0.75f + (distToGoal / 38f) * 0.24f, 0.70f, 0.99f);
+                ShotType sType = distToGoal < 16f ? ShotType.Finesse : (distToGoal > 22f ? ShotType.Power : ShotType.Standard);
 
                 actions.ExecuteShot(sType, aim, power);
                 return;
             }
 
-            // 2. FORWARD ATTACKING RUN (Sprint directly towards opponent goal):
-            Vector3 forwardDribbleDir = (targetGoal - transform.position).normalized;
-            forwardDribbleDir.y = 0f;
-
-            // Evade nearby tackling defenders or slip a forward through pass
-            var pressingOpponent = GetNearestOpponent();
-            if (pressingOpponent != null && Vector3.Distance(transform.position, pressingOpponent.transform.position) < 2.2f)
+            // 2. FORWARD ATTACKING RUN & THROUGH BALLS:
+            // Check if a teammate striker/winger is in front with a clearer path to goal
+            var forwardPassTarget = FindBestPassOption();
+            if (forwardPassTarget != null)
             {
-                var forwardPassTarget = FindBestPassOption();
-                if (forwardPassTarget != null && Vector3.Distance(forwardPassTarget.position, targetGoal) < distToGoal)
+                float teammateDistToGoal = Vector3.Distance(forwardPassTarget.position, targetGoal);
+                if (teammateDistToGoal < distToGoal - 4.0f)
                 {
                     currentAIState = AIState.Passing;
                     Vector3 passDir = (forwardPassTarget.position - transform.position).normalized;
                     passDir.y = 0f;
-                    actions.ExecutePass(PassType.Ground, passDir, 0.78f, forwardPassTarget);
+                    PassType pType = (distToGoal > 45.0f && Mathf.Abs(transform.position.x) > 18.0f) ? PassType.Lobbed : PassType.ThroughBall;
+                    actions.ExecutePass(pType, passDir, 0.85f, forwardPassTarget);
                     return;
                 }
-
-                Vector3 awayFromOpp = (transform.position - pressingOpponent.transform.position).normalized;
-                awayFromOpp.y = 0f;
-                forwardDribbleDir = (forwardDribbleDir * 1.5f + awayFromOpp).normalized;
             }
 
-            // Always drive and sprint directly on goal!
+            // 3. EXPLOSIVE SPRINT DRIBBLE DIRECTLY ON GOAL:
+            Vector3 forwardDribbleDir = (targetGoal - transform.position).normalized;
+            forwardDribbleDir.y = 0f;
+
+            var pressingOpponent = GetNearestOpponent();
+            if (pressingOpponent != null && Vector3.Distance(transform.position, pressingOpponent.transform.position) < 2.0f)
+            {
+                Vector3 awayFromOpp = (transform.position - pressingOpponent.transform.position).normalized;
+                awayFromOpp.y = 0f;
+                forwardDribbleDir = (forwardDribbleDir * 2.0f + awayFromOpp).normalized;
+            }
+
             currentAIState = AIState.DribblingSpace;
             locomotion.SetWorldMovementInput(forwardDribbleDir, true);
         }
@@ -392,76 +397,73 @@ namespace Football.Tactics
                 return;
             }
 
+            Vector3 targetGoal = PitchConstants.GetTargetGoalCenter(runtimeState.teamId);
             float distToBall = Vector3.Distance(transform.position, ball.transform.position);
 
-            // 1. OFFENSIVE SUPPORT: If a teammate has possession, advance into open space to support
+            // 1. DYNAMIC ATTACKING SURGE: If a teammate has possession, charge towards opponent goal!
             if (DoesTeammateHaveBall())
             {
-                bool isPrimarySupport = (tacticsController != null && tacticsController.closestPlayerToBall == this);
-                bool isSecondarySupport = (tacticsController != null && tacticsController.secondClosestPlayerToBall == this);
+                currentAIState = AIState.DribblingSpace;
+                var pos = runtimeState.attributes != null ? runtimeState.attributes.position : PlayerPosition.CM;
 
-                if (isPrimarySupport)
+                Vector3 runTarget;
+                if (pos == PlayerPosition.ST)
                 {
-                    currentAIState = AIState.HoldingAnchor;
-                    Vector3 ballPos = ball.transform.position;
-                    Vector3 targetGoal = PitchConstants.GetTargetGoalCenter(runtimeState.teamId);
-                    Vector3 supportPos = ballPos + (targetGoal - ballPos).normalized * 6.5f + (transform.position - ballPos).normalized * 4.5f;
-                    supportPos.y = 0f;
-
-                    Vector3 toSupport = supportPos - transform.position;
-                    toSupport.y = 0f;
-                    if (toSupport.magnitude > 0.8f)
-                    {
-                        locomotion.SetWorldMovementInput(toSupport.normalized, toSupport.magnitude > 4.0f);
-                    }
-                    else
-                    {
-                        locomotion.SetWorldMovementInput(Vector3.zero, false);
-                    }
-                    return;
+                    // Striker sprints straight into the penalty spot to score!
+                    runTarget = targetGoal + (transform.position - targetGoal).normalized * 12.0f;
                 }
-                else if (isSecondarySupport)
+                else if (pos == PlayerPosition.LW || pos == PlayerPosition.RW || pos == PlayerPosition.LM || pos == PlayerPosition.RM)
                 {
-                    currentAIState = AIState.HoldingAnchor;
-                    Vector3 ballPos = ball.transform.position;
-                    Vector3 supportPos = ballPos + (transform.position - ballPos).normalized * 9.0f;
-                    supportPos.y = 0f;
-
-                    Vector3 toSupport = supportPos - transform.position;
-                    toSupport.y = 0f;
-                    if (toSupport.magnitude > 1.0f)
-                    {
-                        locomotion.SetWorldMovementInput(toSupport.normalized, false);
-                    }
-                    else
-                    {
-                        locomotion.SetWorldMovementInput(Vector3.zero, false);
-                    }
-                    return;
+                    // Wingers sprint into dangerous crossing / cutback positions inside 18m
+                    runTarget = targetGoal + (transform.position - targetGoal).normalized * 16.0f + (pos == PlayerPosition.LW || pos == PlayerPosition.LM ? Vector3.left : Vector3.right) * 8.0f;
                 }
+                else if (pos == PlayerPosition.CAM || pos == PlayerPosition.CM)
+                {
+                    // Midfielders arrive at the edge of the box (22m) for long shots & rebounds
+                    runTarget = targetGoal + (transform.position - targetGoal).normalized * 22.0f;
+                }
+                else
+                {
+                    // Defenders push up high to midfield (tactical anchor)
+                    runTarget = tacticalAnchor;
+                }
+
+                runTarget.y = 0f;
+                Vector3 toRun = runTarget - transform.position;
+                toRun.y = 0f;
+
+                if (toRun.magnitude > 1.0f)
+                {
+                    locomotion.SetWorldMovementInput(toRun.normalized, true);
+                }
+                else
+                {
+                    locomotion.SetWorldMovementInput(Vector3.zero, false);
+                }
+                return;
             }
 
-            // 2. DEFENSIVE PRESSING & TACKLING: Relentlessly chase the ball carrier!
-            bool isFirstPresser = (tacticsController != null && tacticsController.closestPlayerToBall == this) || distToBall < 5.0f;
-            bool isSecondPresser = (tacticsController != null && tacticsController.secondClosestPlayerToBall == this);
+            // 2. RELENTLESS HIGH PRESS & TACKLING:
+            bool isFirstPresser = (tacticsController != null && tacticsController.closestPlayerToBall == this) || distToBall < 6.0f;
+            bool isSecondPresser = (tacticsController != null && tacticsController.secondClosestPlayerToBall == this) || distToBall < 10.0f;
 
-            if (isFirstPresser)
+            if (isFirstPresser || distToBall < 3.5f)
             {
                 currentAIState = AIState.PressingBall;
                 Vector3 toBall = ball.transform.position - transform.position;
                 toBall.y = 0f;
 
                 // Full sprint to win the ball!
-                locomotion.SetWorldMovementInput(toBall.normalized, distToBall > 1.8f);
+                locomotion.SetWorldMovementInput(toBall.normalized, true);
 
-                // Tackle when within range
-                if (distToBall < 1.6f)
+                // Tackle with aggression
+                if (distToBall < 1.8f)
                 {
-                    if (Random.value < 0.75f)
+                    if (Random.value < 0.80f)
                     {
                         actions.ExecuteStandingTackle();
                     }
-                    else if (distToBall > 1.1f && distToBall < 1.8f)
+                    else if (distToBall > 1.0f && distToBall < 2.2f)
                     {
                         actions.ExecuteSlideTackle();
                     }
@@ -469,27 +471,19 @@ namespace Football.Tactics
             }
             else if (isSecondPresser)
             {
-                // Secondary cover: cut passing lane towards goal
+                // Secondary press: close down carrier and cut passing angles
                 currentAIState = AIState.PressingBall;
                 Vector3 ballPos = ball.transform.position;
-                Vector3 ownGoal = PitchConstants.GetDefendingGoalCenter(runtimeState.teamId);
-                Vector3 coverPos = ballPos + (ownGoal - ballPos).normalized * 4.5f;
-                coverPos.y = 0f;
+                Vector3 pressPos = ballPos + (transform.position - ballPos).normalized * 2.5f;
+                pressPos.y = 0f;
 
-                Vector3 toCover = coverPos - transform.position;
-                toCover.y = 0f;
-                if (toCover.magnitude > 0.8f)
-                {
-                    locomotion.SetWorldMovementInput(toCover.normalized, toCover.magnitude > 3.5f);
-                }
-                else
-                {
-                    locomotion.SetWorldMovementInput(Vector3.zero, false);
-                }
+                Vector3 toPress = pressPos - transform.position;
+                toPress.y = 0f;
+                locomotion.SetWorldMovementInput(toPress.normalized, true);
             }
             else
             {
-                // Hold tactical anchor
+                // Compact high defensive line
                 currentAIState = AIState.HoldingAnchor;
                 Vector3 toAnchor = tacticalAnchor - transform.position;
                 toAnchor.y = 0f;
@@ -497,7 +491,7 @@ namespace Football.Tactics
 
                 if (dist > 1.2f)
                 {
-                    locomotion.SetWorldMovementInput(toAnchor.normalized, dist > 6.0f);
+                    locomotion.SetWorldMovementInput(toAnchor.normalized, dist > 4.0f);
                 }
                 else
                 {
@@ -516,6 +510,8 @@ namespace Football.Tactics
             float minFallbackDist = float.MaxValue;
 
             Vector3 myPos = transform.position;
+            Vector3 targetGoal = PitchConstants.GetTargetGoalCenter(runtimeState.teamId);
+            float myDistToGoal = Vector3.Distance(myPos, targetGoal);
             var allPlayers = FindObjectsByType<PlayerRuntimeState>(FindObjectsSortMode.None);
 
             for (int i = 0; i < tacticsController.teamPlayers.Count; i++)
@@ -528,7 +524,7 @@ namespace Football.Tactics
                 toTeammate.y = 0;
                 float dist = toTeammate.magnitude;
 
-                if (dist < 2.0f || dist > 44.0f) continue;
+                if (dist < 2.0f || dist > 48.0f) continue;
 
                 if (dist < minFallbackDist)
                 {
@@ -560,9 +556,10 @@ namespace Football.Tactics
                     }
                 }
 
-                // Tactical score: forward progression towards opponent goal, distance preference, and lane clearance
-                float progressScore = (tacticsController.teamId == 1) ? toTeammate.z : -toTeammate.z;
-                float score = progressScore * 1.5f + (36f - dist) * 0.4f + (laneClear ? 25f : -30f);
+                // Tactical score: forward progression closer to opponent goal, distance preference, and lane clearance
+                float teammateDistToGoal = Vector3.Distance(teammatePos, targetGoal);
+                float progressScore = myDistToGoal - teammateDistToGoal; // Positive if teammate is closer to goal
+                float score = progressScore * 2.0f + (40f - dist) * 0.4f + (laneClear ? 30f : -25f);
 
                 if (score > bestScore)
                 {

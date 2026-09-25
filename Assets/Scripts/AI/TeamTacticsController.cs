@@ -93,15 +93,31 @@ namespace Football.Tactics
             var ball = FootballBall.Instance;
             Vector3 ballPos = ball != null ? ball.transform.position : Vector3.zero;
 
-            // Mentality shift along Z-axis
+            // Check if our team has possession
+            bool teamHasBall = false;
+            for (int i = 0; i < teamPlayers.Count; i++)
+            {
+                if (teamPlayers[i] != null && teamPlayers[i].RuntimeState != null && teamPlayers[i].RuntimeState.hasBall)
+                {
+                    teamHasBall = true;
+                    break;
+                }
+            }
+
+            // Mentality shift along Z-axis (push deep into opponent half when attacking)
             float mentalityZShift = 0f;
             switch (mentality)
             {
-                case TeamMentality.UltraDefensive: mentalityZShift = -8.0f; break;
-                case TeamMentality.Defensive: mentalityZShift = -4.0f; break;
-                case TeamMentality.Balanced: mentalityZShift = 0.0f; break;
-                case TeamMentality.Attacking: mentalityZShift = 5.0f; break;
-                case TeamMentality.UltraAttacking: mentalityZShift = 9.0f; break;
+                case TeamMentality.UltraDefensive: mentalityZShift = -6.0f; break;
+                case TeamMentality.Defensive: mentalityZShift = -2.0f; break;
+                case TeamMentality.Balanced: mentalityZShift = 4.0f; break;
+                case TeamMentality.Attacking: mentalityZShift = 12.0f; break;
+                case TeamMentality.UltraAttacking: mentalityZShift = 18.0f; break;
+            }
+
+            if (teamHasBall)
+            {
+                mentalityZShift += 8.0f; // High surge forward when in possession
             }
 
             for (int i = 0; i < teamPlayers.Count; i++)
@@ -115,11 +131,11 @@ namespace Football.Tactics
                 var slot = formationSlots[slotIdx];
                 Vector3 basePos = FormationData.GetWorldPosition(slot, teamId, mentalityZShift);
 
-                // Outfield players gently shift with play
+                // Outfield players dynamically follow play and shift towards the ball line
                 if (slot.position != PlayerPosition.GK)
                 {
-                    float ballInfluenceZ = ballPos.z * ballFollowFactor;
-                    float ballInfluenceX = ballPos.x * 0.15f;
+                    float ballInfluenceZ = ballPos.z * (teamHasBall ? 0.75f : 0.55f);
+                    float ballInfluenceX = ballPos.x * 0.25f;
 
                     basePos.x += ballInfluenceX;
                     basePos.z += ballInfluenceZ;
